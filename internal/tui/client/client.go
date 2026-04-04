@@ -70,11 +70,11 @@ func CreateSession(prompt string) string {
 	return strings.TrimSpace(string(body))
 }
 
-func ChatCompletion(ctx context.Context, session_id string, prompt string) chan models.StoredMessageData {
+func ChatCompletion(ctx context.Context, session_id string, prompt string, mode string) chan models.StoredMessageData {
 	ch := make(chan models.StoredMessageData)
 	go func() {
 		defer close(ch)
-		url := baseUrl + "/chat-completion?session_id=" + url.QueryEscape(session_id) + "&prompt=" + url.QueryEscape(prompt)
+		url := baseUrl + "/chat-completion?session_id=" + url.QueryEscape(session_id) + "&prompt=" + url.QueryEscape(prompt) + "&mode=" + url.QueryEscape(mode)
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
 			fmt.Println(err.Error())

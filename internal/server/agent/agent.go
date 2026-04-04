@@ -21,7 +21,7 @@ func New() *Agent {
 	return &Agent{}
 }
 
-func (a *Agent) Run(ctx context.Context, prompt string, session_id string) <-chan models.StoredMessageData {
+func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode string) <-chan models.StoredMessageData {
 	ch := make(chan models.StoredMessageData)
 	// currentPrompt := prompt
 	database, err := db.Connect()
@@ -86,7 +86,7 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string) <-cha
 					chats = append(chats, llm.Chat{Role: d.Role, Content: d.Content})
 				}
 			}
-			resp := llm.ApiCall(ctx, "", chats)
+			resp := llm.ApiCall(ctx, "", chats, mode)
 			select {
 			case <-ctx.Done():
 				return

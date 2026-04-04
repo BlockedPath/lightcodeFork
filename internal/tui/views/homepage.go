@@ -75,6 +75,7 @@ type model struct {
 	questionAnswers   []string
 	questionSelected  int
 	todoList          []models.ToDo
+	mode              string
 }
 
 func initialModel() model {
@@ -145,6 +146,7 @@ func initialModel() model {
 		spinner:           spin,
 		isGenerating:      false,
 		lastEsc:           time.Now(),
+		mode:              "chat",
 	}
 	m.syncLayout()
 	return m
@@ -160,6 +162,9 @@ func (m *model) syncLayout() {
 
 	reservedHeight := m.textarea.Height()
 	if m.isGenerating {
+		reservedHeight++
+	}
+	if m.mode == "chat" || m.mode == "plan" {
 		reservedHeight++
 	}
 	if m.islistCommandsWin {
@@ -325,7 +330,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			m.viewport.SetContent(renderMessages(m.messages, m.width))
 			ctx, cancel := context.WithCancel(context.Background())
-			ch := client.ChatCompletion(ctx, m.currentSession.ID, textareaValue)
+			ch := client.ChatCompletion(ctx, m.currentSession.ID, textareaValue, m.mode)
 			m.cancelStream = cancel
 			m.streamCh = ch
 			m.textarea.SetValue("")
@@ -336,6 +341,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var cmd tea.Cmd
 			m.viewport, cmd = m.viewport.Update(msg)
 			return m, cmd
+		case "tab":
+			if m.mode != "plan" {
+				m.mode = "plan"
+			} else {
+				m.mode = "chat"
+			}
+
 		case "/":
 			var cmd tea.Cmd
 			m.textarea, cmd = m.textarea.Update(msg)
@@ -415,8 +427,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case streamDoneMsg:
 		m.streamCh = nil
-		m.todoList = client.GetCurrentTodoList(m.currentSession.ID)
-		fmt.Println("+++++++++++++++++", "TODOLIST", m.todoList, "+++++++++++++++++")
 		m.isGenerating = false
 		m.syncLayout()
 		return m, nil
@@ -447,7 +457,7 @@ func (m model) View() tea.View {
 	if m.questionMode {
 		sections = append(sections, m.renderQuestionUI())
 	}
-
+	sections = append(sections, m.mode)
 	textareaSectionIndex := len(sections)
 	sections = append(sections, m.textarea.View())
 
@@ -975,7 +985,7 @@ func (m model) submitQuestionAnswers() (tea.Model, tea.Cmd) {
 	m.syncLayout()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	ch := client.ChatCompletion(ctx, m.currentSession.ID, answer)
+	ch := client.ChatCompletion(ctx, m.currentSession.ID, answer, m.mode)
 	m.cancelStream = cancel
 	m.streamCh = ch
 	m.viewport.GotoBottom()

@@ -73,20 +73,23 @@ func GetAllTools() []responses.ToolUnionParam {
 	return result
 }
 
-func GetToolsForPlan() []responses.ToolUnionParam {
+func GetToolsForPlan() []openai.ChatCompletionToolUnionParam {
 	mu.RLock()
 	defer mu.RUnlock()
 
-	var result []responses.ToolUnionParam
+	var result []openai.ChatCompletionToolUnionParam
 	for name, def := range defs {
 		if name == "write_file" || name == "edit" {
 			continue
 		}
-		result = append(result, responses.ToolUnionParam{
-			OfFunction: &responses.FunctionToolParam{
-				Name:        name,
-				Description: openai.String(def.Description),
-				Parameters:  def.Params,
+		result = append(result, openai.ChatCompletionToolUnionParam{
+			OfFunction: &openai.ChatCompletionFunctionToolParam{
+				Type: "function",
+				Function: shared.FunctionDefinitionParam{
+					Name:        name,
+					Description: openai.String(def.Description),
+					Parameters:  def.Params,
+				},
 			},
 		})
 	}

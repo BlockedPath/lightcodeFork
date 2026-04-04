@@ -92,12 +92,13 @@ func chatcompletion(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	session_id := r.URL.Query().Get("session_id")
 	prompt := r.URL.Query().Get("prompt")
+	mode := r.URL.Query().Get("mode")
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
 		return
 	}
-	for result := range agent.New().Run(r.Context(), prompt, session_id) {
+	for result := range agent.New().Run(r.Context(), prompt, session_id, mode) {
 		if r.Context().Err() != nil {
 			return
 		}

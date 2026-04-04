@@ -48,21 +48,20 @@ The agent streams responses over Server-Sent Events while tool calls and file op
 - [x] better tool and thinking formating
 - [x] Skills
 - [x] grep tool
-- [x] arrow key should bring previous text // scrapped
 - [x] first make the ui work
 - [x] UI upgrades
 - [x] Make config files
 - [X] improve tools and make test
 - [x] Fix the database bug
 - [x] Limit accessible directory to working dir
-- [ ] File tracker - create a folder in ~/.lightcode/file_tracker and track in that
-- [ ] MCP - go mcp sdk with reference from other projects
-- [ ] todo tool
 - [x] question tool - homepage 381, just need to create a ui and send chat completion request
 - [x] Show Code changes
-- [ ] Plan mode - prompt and tool filter
-- [ ] json data for model selection etc
+- [x] Plan mode - prompt and tool filter
 
+- [ ] json data for model selection etc
+- [ ] File tracker - create a folder in ~/.lightcode/file_tracker and track in that
+- [ ] MCP - go mcp sdk with reference from other projects
+- [ ] todo tool - handle in the ui and send it as context in agent.go 
 
 
 

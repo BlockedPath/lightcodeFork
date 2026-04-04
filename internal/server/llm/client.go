@@ -29,31 +29,43 @@ type Chat struct {
 	Content string
 }
 
-func ApiCall(ctx context.Context, input string, chats []Chat) Response {
+func ApiCall(ctx context.Context, input string, chats []Chat, mode string) Response {
 	godotenv.Load(config.EnvPath())
 	var toolCalls []ToolCall
 	// ctx := context.Background()
 	client := openai.NewClient()
 
 	var messages []openai.ChatCompletionMessageParamUnion
-	messages = append(messages, openai.SystemMessage("You are a helpful assistant that can use the following skills to help the user: "+"Available skills: "+" "+prompt.AvailableSkills()))
+	if mode == "plan" {
+		messages = append(messages, openai.SystemMessage(prompt.Plan_prompt()))
+	} else {
+		messages = append(messages, openai.SystemMessage(prompt.SystemPrompt()+" Available skills: "+" "+prompt.AvailableSkills()))
+	}
 
 	for _, c := range chats {
-		if c.Role == "user" {
+		switch c.Role {
+		case "user":
 			messages = append(messages, openai.UserMessage(c.Content))
-		} else if c.Role == "assistant" {
+		case "assistant":
 			messages = append(messages, openai.AssistantMessage(c.Content))
 		}
 	}
 	if input != "" {
 		messages = append(messages, openai.UserMessage(input))
 	}
-
 	resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Messages: messages,
 		Tools:    tools.GetToolsForChat(),
 		Model:    "Minimax-M2.5",
 	})
+	if mode == "plan" {
+		resp, err = client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+			Messages: messages,
+			Tools:    tools.GetToolsForPlan(),
+			Model:    "Minimax-M2.5",
+		})
+	}
+
 	if err != nil {
 		fmt.Println("Error", err)
 		return Response{
