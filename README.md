@@ -37,7 +37,7 @@ The agent streams responses over Server-Sent Events while tool calls and file op
 | `cmd/server` | HTTP API: sessions, messages, streaming chat completion |
 | `cmd/tui` | Bubble Tea frontend that calls the API |
 | `internal/server/agent` | Agent loop, message history, tool execution |
-| `internal/server/tools` | `read_file`, `write_file`, `edit`, `bash`, `grep`, `glob`, `list_dir`, `web_fetch`, `skill` |
+| `internal/server/tools` | `read_file`, `write_file`, `edit`, `bash`, `grep`, `glob`, `list_dir`, `web_fetch`, `skill`, `todo` |
 | `internal/server/db` | GORM + SQLite (`lightcode.db`) for sessions and messages |
 
 ---
@@ -53,8 +53,26 @@ The agent streams responses over Server-Sent Events while tool calls and file op
 - [x] UI upgrades
 - [x] Make config files
 - [X] improve tools and make test
-- [ ] Fix the database bug
-- [ ] File tracker
-- [ ] MCP
+- [x] Fix the database bug
+- [ ] File tracker - create a folder in ~/.lightcode/file_tracker and track in that
+- [ ] MCP - go mcp sdk with reference from other projects
 - [ ] todo tool
-- [ ] question tool 
+- [ ] question tool - homepage 381, just need to create a ui and send chat completion request
+- [x] Show Code changes
+- [ ] Plan mode - prompt and tool filter
+- [ ] json data for model selection etc
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

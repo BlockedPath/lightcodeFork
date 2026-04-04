@@ -94,7 +94,7 @@ func initialModel() model {
 	}
 
 	ta.SetWidth(width)
-	ta.SetHeight(2)
+	ta.SetHeight(3)
 
 	ta.SetStyles(s)
 
@@ -211,6 +211,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				var cmd tea.Cmd
 				m.textarea, cmd = m.textarea.Update(msg)
 				val := m.textarea.Value()
+
 				if !strings.HasPrefix(val, "/") {
 					m.islistCommandsWin = false
 					m.syncLayout()
@@ -247,7 +248,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.syncLayout()
 				m.messages = append(m.messages, models.Message{
 					SessionID: m.currentSession.ID,
-					// ID:        fmt.Sprintf("%s-system-%d", m.currentSession.ID, len(m.messages)),
 					Data: models.EncodeMessageData(models.StoredMessageData{
 						Role: "assistant", Content: "*Generation stopped.*",
 					}),
@@ -283,16 +283,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textarea.SetValue(curVal + pasteValue)
 			}
 			return m, nil
-		case "shift+enter":
-			curVal := m.textarea.Value()
-			if m.textarea.Height() == len(strings.Split(curVal, "\n")) {
-				if m.textarea.Height() < 4 {
-					m.textarea.SetHeight(m.textarea.Height() + 1)
-					m.syncLayout()
-				}
-			}
-			m.textarea.SetValue(curVal + "\n")
-			return m, nil
+		// case "shift+enter":
+		// 	curVal := m.textarea.Value()
+		// 	m.textarea.SetValue(curVal + "\n")
+		// 	m.adjustTextareaHeight()
+		// 	return m, nil
 		case "enter":
 			if strings.HasPrefix(m.textarea.Value(), "/") {
 				cmd := CmdHandler(m.textarea.Value(), &m)
@@ -338,6 +333,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 			var cmd tea.Cmd
 			m.textarea, cmd = m.textarea.Update(msg)
+			// m.adjustTextareaHeight()
 
 			previousBashMode := m.bashMode
 			if strings.HasPrefix(m.textarea.Value(), "!") {
@@ -373,9 +369,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// ID:        fmt.Sprintf("%s-assistant-%d", m.currentSession.ID, len(m.messages)),
 			Data: models.EncodeMessageData(models.StoredMessageData(msg)),
 		})
+
 		m.viewport.SetContent(renderMessages(m.messages, m.width))
 		m.syncLayout()
 		m.viewport.GotoBottom()
+		if msg.Role == "question" {
+			m.bashMode = true
+			// return m, streamDoneMsg
+		}
 		return m, waitForMessages(m.streamCh)
 
 	case streamDoneMsg:
@@ -443,6 +444,14 @@ var (
 	styleUser       = lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Bold(true).Background(lipgloss.Color("236")).Padding(0, 1)
 	styleThink      = lipgloss.NewStyle().Foreground(lipgloss.BrightBlack).Bold(false)
 	styleResultText = lipgloss.NewStyle().Foreground(lipgloss.Color("7"))
+	styleAdded      = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#aff5b4")).
+			Background(lipgloss.Color("#1a3a2a")).
+			PaddingLeft(1)
+	styleRemoved = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#ffdcd7")).
+			Background(lipgloss.Color("#3d1a1f")).
+			PaddingLeft(1)
 )
 
 func formatToolCall(tc models.StoredToolCall) string {
@@ -455,19 +464,45 @@ func formatToolCall(tc models.StoredToolCall) string {
 	if err != nil {
 		return styleToolName.Render(tc.Name) + "()"
 	}
+	if len(values) > 7 {
+		values = values[:7]
+		values = append(values, values[7]+"...")
+	}
 	return styleToolName.Render(tc.Name) + "(" + styleTree.Render(strings.Join(values, ", ")) + ")"
 }
 
-func formatToolResult(content string) string {
+func formatToolResult(content string, codeChanges []string, width int) string {
 	content = strings.TrimSpace(content)
 	if content == "" {
 		return styleResultText.Render("(no output)")
 	}
-	lines := strings.Split(content, "\n")
-	if len(lines) <= 4 {
-		return styleResultText.Render(content)
+	if len(codeChanges) == 0 {
+		lines := strings.Split(content, "\n")
+		if len(lines) <= 4 {
+			return styleResultText.Render(content)
+		}
+		return styleTree.Render(strings.Join(lines[:4], "\n") + "...")
 	}
-	return styleTree.Render(strings.Join(lines[:4], "\n") + "...")
+
+	var sb strings.Builder
+	sb.WriteString("\n")
+	oldlines := strings.Split(codeChanges[0], "\n")
+	if len(oldlines) > 4 {
+		oldlines = oldlines[:4]
+	}
+	newlines := strings.Split(codeChanges[1], "\n")
+	if len(newlines) > 4 {
+		newlines = newlines[:4]
+	}
+	for _, line := range newlines {
+		sb.WriteString(styleRemoved.Width(width).Render("- " + line))
+		sb.WriteString("\n")
+	}
+	for _, line := range oldlines {
+		sb.WriteString(styleAdded.Width(width).Render("+ " + line))
+		sb.WriteString("\n")
+	}
+	return sb.String()
 }
 
 // lightcodeGlamourStyle is a custom glamour style tuned to match the app palette.
@@ -658,7 +693,7 @@ func renderMessages(msgs []models.Message, width int) string {
 				if len(d.ToolCalls) > 0 {
 					lines = append(lines, dot+" "+formatToolCall(d.ToolCalls[0]))
 				}
-				resultSummary := formatToolResult(content)
+				resultSummary := formatToolResult(content, d.CodeChanges, width)
 				lines = append(lines, tree+" "+resultSummary)
 
 			case "user":

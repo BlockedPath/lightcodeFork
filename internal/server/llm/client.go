@@ -36,7 +36,7 @@ func ApiCall(ctx context.Context, input string, chats []Chat) Response {
 	client := openai.NewClient()
 
 	var messages []openai.ChatCompletionMessageParamUnion
-	messages = append(messages, openai.SystemMessage("You are a helpful assistant that can use the following skills to help the user: "+prompt.AvailableSkills()))
+	messages = append(messages, openai.SystemMessage("You are a helpful assistant that can use the following skills to help the user: "+"Available skills: "+" "+prompt.AvailableSkills()))
 
 	for _, c := range chats {
 		if c.Role == "user" {
@@ -56,7 +56,11 @@ func ApiCall(ctx context.Context, input string, chats []Chat) Response {
 	})
 	if err != nil {
 		fmt.Println("Error", err)
-		return Response{}
+		return Response{
+			Text:             "Ran into an error while calling the LLM",
+			ToolCalls:        []ToolCall{},
+			CompleteResponse: nil,
+		}
 	}
 	if len(resp.Choices) == 0 {
 		return Response{
@@ -81,10 +85,10 @@ func ApiCall(ctx context.Context, input string, chats []Chat) Response {
 	}
 }
 
-func ExecuteToolCall(tc ToolCall, workingDirectory string, sessionID string) (string, error) {
+func ExecuteToolCall(tc ToolCall, workingDirectory string, sessionID string) (tools.ToolResponse, error) {
 	args, err := tools.ParseArgs(tc.Arguments)
 	if err != nil {
-		return "", err
+		return tools.ToolResponse{Content: "Error: " + err.Error()}, err
 	}
 	return tools.Execute(tc.Name, tools.ToolContext{WorkingDirectory: workingDirectory, SessionID: sessionID}, args)
 }

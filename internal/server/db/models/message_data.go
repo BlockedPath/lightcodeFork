@@ -3,10 +3,11 @@ package models
 import "encoding/json"
 
 type StoredMessageData struct {
-	Role      string           `json:"role"`
-	Content   string           `json:"content,omitempty"`
-	Usage     *StoredUsage     `json:"usage,omitempty"`
-	ToolCalls []StoredToolCall `json:"tool_calls,omitempty"`
+	Role        string           `json:"role"`
+	Content     string           `json:"content,omitempty"`
+	CodeChanges []string         `json:"code_changes,omitempty"`
+	Usage       *StoredUsage     `json:"usage,omitempty"`
+	ToolCalls   []StoredToolCall `json:"tool_calls,omitempty"`
 }
 
 type StoredUsage struct {

@@ -45,17 +45,6 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string) <-cha
 
 	go func() {
 		defer close(ch)
-		// var prior []models.Message
-		// database.Where("session_id = ?", session_id).Find(&prior)
-		// userTurn := models.Message{
-		// 	SessionID: session_id,
-		// 	// ID:        fmt.Sprintf("%s-%d", session_id, len(prior)),
-		// 	Data: models.EncodeMessageData(models.StoredMessageData{Role: "user", Content: prompt}),
-		// }
-		// if err := database.Create(&userTurn).Error; err != nil {
-		// 	// fmt.Println("Error saving user message:", err)
-		// 	return
-		// }
 
 		for i := 0; i < MaxIterations; i++ {
 
@@ -165,6 +154,15 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string) <-cha
 				if DEBUG {
 					fmt.Println("Executing tool call:", tc.Name)
 				}
+				if tc.Name == "question" {
+					ch <- models.StoredMessageData{Role: "question", Content: tc.Arguments}
+					questionMsg := models.Message{
+						SessionID: session_id,
+						Data:      models.EncodeMessageData(models.StoredMessageData{Role: "question", Content: tc.Arguments, ToolCalls: []models.StoredToolCall{{ID: tc.ID, Name: tc.Name, Arguments: tc.Arguments}}}),
+					}
+					database.Create(&questionMsg)
+					return
+				}
 				result, err := llm.ExecuteToolCall(tc, session.Directory, session_id)
 				if err != nil {
 					if DEBUG {
@@ -173,11 +171,10 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string) <-cha
 					ch <- models.StoredMessageData{Role: "error", Content: fmt.Sprintf("Tool '%s' failed: %v", tc.Name, err)}
 					continue
 				}
-				ch <- models.StoredMessageData{Role: "tool_call", Content: result, ToolCalls: []models.StoredToolCall{{ID: tc.ID, Name: tc.Name, Arguments: tc.Arguments}}}
+				ch <- models.StoredMessageData{Role: "tool_call", Content: result.Content, CodeChanges: result.CodeChanges, ToolCalls: []models.StoredToolCall{{ID: tc.ID, Name: tc.Name, Arguments: tc.Arguments}}}
 				toolMsg := models.Message{
 					SessionID: session_id,
-					// ID:        fmt.Sprintf("%s-%d", session_id, len(messages)+1+i), // Simplified ID generation
-					Data: models.EncodeMessageData(models.StoredMessageData{Role: "tool_call", Content: result, ToolCalls: []models.StoredToolCall{{ID: tc.ID, Name: tc.Name, Arguments: tc.Arguments}}}),
+					Data:      models.EncodeMessageData(models.StoredMessageData{Role: "tool_call", Content: result.Content, CodeChanges: result.CodeChanges, ToolCalls: []models.StoredToolCall{{ID: tc.ID, Name: tc.Name, Arguments: tc.Arguments}}}),
 				}
 				database.Create(&toolMsg)
 				if DEBUG {
