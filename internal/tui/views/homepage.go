@@ -428,6 +428,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case streamDoneMsg:
 		m.streamCh = nil
 		m.isGenerating = false
+		if m.currentSession.ID != "" {
+			m.todoList = client.GetCurrentTodoList(m.currentSession.ID)
+			m.messages = withoutEphemeralTodoStatus(m.messages)
+			if len(m.todoList) != 0 {
+				m.messages = append(m.messages, models.Message{
+					SessionID: m.currentSession.ID,
+					Data: models.EncodeMessageData(models.StoredMessageData{
+						Role:    "todo_status",
+						Content: models.EncodeToDoList(m.todoList),
+					}),
+				})
+			}
+		}
+		m.viewport.SetContent(renderMessages(m.messages, m.width))
+		m.viewport.GotoBottom()
 		m.syncLayout()
 		return m, nil
 
@@ -500,7 +515,55 @@ var (
 			Foreground(lipgloss.Color("#ffdcd7")).
 			Background(lipgloss.Color("#3d1a1f")).
 			PaddingLeft(1)
+	styleTodoTitle = lipgloss.NewStyle().Foreground(lipgloss.Color("86")).Bold(true)
+	styleTodoEmpty = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true)
+	styleTodoDone  = lipgloss.NewStyle().Foreground(lipgloss.Color("114")).Strikethrough(true)
+	styleTodoOpen  = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	styleTodoBox   = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("238")).
+			Padding(0, 1).
+			MarginLeft(2)
 )
+
+func withoutEphemeralTodoStatus(msgs []models.Message) []models.Message {
+	var out []models.Message
+	for _, msg := range msgs {
+		if models.DecodeMessageData(msg.Data).Role == "todo_status" {
+			continue
+		}
+		out = append(out, msg)
+	}
+	return out
+}
+
+func renderTodoStatusBlock(dot string, todos []models.ToDo, width int) string {
+	title := styleTodoTitle.Render("Task list")
+	boxStyle := styleTodoBox
+	if width > 8 {
+		boxStyle = boxStyle.MaxWidth(width - 4)
+	}
+	var inner strings.Builder
+	if len(todos) == 0 {
+		inner.WriteString(styleTodoEmpty.Render("No tasks in this session."))
+	} else {
+		for i, t := range todos {
+			prefix := "├ "
+			if i == len(todos)-1 {
+				prefix = "└ "
+			}
+			mark := lipgloss.NewStyle().Foreground(lipgloss.Color("243")).Render("[ ] ")
+			line := styleTodoOpen.Render(t.Description)
+			if t.Completed {
+				mark = lipgloss.NewStyle().Foreground(lipgloss.Color("114")).Render("[✓] ")
+				line = styleTodoDone.Render(t.Description)
+			}
+			inner.WriteString(styleTree.Render(prefix) + mark + line + "\n")
+		}
+	}
+	boxed := boxStyle.Render(strings.TrimSuffix(inner.String(), "\n"))
+	return dot + " " + title + "\n" + boxed
+}
 
 func formatToolCall(tc models.StoredToolCall) string {
 	var args map[string]interface{}
@@ -757,6 +820,9 @@ func renderMessages(msgs []models.Message, width int) string {
 					}
 					lines = append(lines, line)
 				}
+			case "todo_status":
+				todos := models.DecodeToDoList(content)
+				lines = append(lines, renderTodoStatusBlock(dot, todos, width))
 			}
 		} else if d.Role == "assistant" && len(d.ToolCalls) > 0 {
 			// Assistant message with ONLY tool calls (no text content)

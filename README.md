@@ -57,17 +57,11 @@ The agent streams responses over Server-Sent Events while tool calls and file op
 - [x] question tool - homepage 381, just need to create a ui and send chat completion request
 - [x] Show Code changes
 - [x] Plan mode - prompt and tool filter
+- [x] todo tool - handle in the ui and send it as context in agent.go 
 
 - [ ] json data for model selection etc
 - [ ] File tracker - create a folder in ~/.lightcode/file_tracker and track in that
 - [ ] MCP - go mcp sdk with reference from other projects
-- [ ] todo tool - handle in the ui and send it as context in agent.go 
-
-
-
-
-
-
 
 
 
