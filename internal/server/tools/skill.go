@@ -11,26 +11,26 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func Skill(ctx ToolContext, args map[string]any) (string, error) {
+func Skill(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	skillName, ok := args["skillName"].(string)
 	if !ok {
-		return "", nil
+		return ToolResponse{Content: "Error: skillName is required and must be a string"}, nil
 	}
 	skillPath := os.Getenv("SKILL_PATH")
 	if skillPath == "" {
-		return "Skill path not found", nil
+		return ToolResponse{Content: "Skill path not found"}, nil
 	}
 	fmt.Println("Skill path", skillPath)
 	skillFilePath := filepath.Join(skillPath, skillName, "SKILL.md")
 	fmt.Println("Skill file path", skillFilePath)
 	data, err := os.ReadFile(skillFilePath)
 	if err != nil {
-		return "Skill not found", err
+		return ToolResponse{Content: "Skill not found"}, err
 	}
 	skillDir := filepath.Join(skillPath, skillName)
 	entries, err := os.ReadDir(skillDir)
 	if err != nil {
-		return "", err
+		return ToolResponse{Content: "Error: " + err.Error()}, err
 	}
 	skill_files := []string{}
 	for _, entry := range entries {
@@ -48,7 +48,7 @@ func Skill(ctx ToolContext, args map[string]any) (string, error) {
 	skill := re.ReplaceAllString(string(data), "")
 	skillFilesBlock := "\n<skill_files>\n" + strings.Join(skill_files, "\n") + "\n</skill_files>"
 	skill = "<skill_content name=\"" + skillName + "\">" + skill + skillFilesBlock + "</skill_content>"
-	return skill, nil
+	return ToolResponse{Content: skill}, nil
 }
 
 func init() {

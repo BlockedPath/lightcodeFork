@@ -14,12 +14,17 @@ type ToolContext struct {
 	SessionID        string
 }
 
-type ToolFunc func(ctx ToolContext, args map[string]any) (string, error)
+type ToolFunc func(ctx ToolContext, args map[string]any) (ToolResponse, error)
 
 type ToolDef struct {
 	Name        string
 	Description string
 	Params      map[string]any
+}
+
+type ToolResponse struct {
+	Content     string
+	CodeChanges []string
 }
 
 var (
@@ -35,16 +40,17 @@ func Register(name string, def ToolDef, fn ToolFunc) {
 	defs[name] = def
 }
 
-func Execute(name string, ctx ToolContext, args map[string]any) (string, error) {
+func Execute(name string, ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	mu.RLock()
 	fn := funcs[name]
 	mu.RUnlock()
 
 	if fn == nil {
-		return "", nil
+		return ToolResponse{Content: "Error: tool not found"}, nil
 	}
 
 	return fn(ctx, args)
+
 }
 
 func GetAllTools() []responses.ToolUnionParam {
@@ -53,6 +59,26 @@ func GetAllTools() []responses.ToolUnionParam {
 
 	var result []responses.ToolUnionParam
 	for name, def := range defs {
+		result = append(result, responses.ToolUnionParam{
+			OfFunction: &responses.FunctionToolParam{
+				Name:        name,
+				Description: openai.String(def.Description),
+				Parameters:  def.Params,
+			},
+		})
+	}
+	return result
+}
+
+func GetToolsForPlan() []responses.ToolUnionParam {
+	mu.RLock()
+	defer mu.RUnlock()
+
+	var result []responses.ToolUnionParam
+	for name, def := range defs {
+		if name == "write_file" || name == "edit" {
+			continue
+		}
 		result = append(result, responses.ToolUnionParam{
 			OfFunction: &responses.FunctionToolParam{
 				Name:        name,

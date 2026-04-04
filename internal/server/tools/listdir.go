@@ -5,17 +5,17 @@ import (
 	"path/filepath"
 )
 
-func ListDir(ctx ToolContext, args map[string]any) (string, error) {
+func ListDir(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	path, ok := args["path"].(string)
 	if !ok {
-		return "", nil
+		return ToolResponse{Content: "Error: path is required and must be a string"}, nil
 	}
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(ctx.WorkingDirectory, path)
 	}
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		return "", err
+		return ToolResponse{Content: "Error: " + err.Error()}, err
 	}
 
 	var result string
@@ -26,7 +26,7 @@ func ListDir(ctx ToolContext, args map[string]any) (string, error) {
 			result += e.Name() + "\n"
 		}
 	}
-	return result, nil
+	return ToolResponse{Content: result}, nil
 }
 
 func init() {

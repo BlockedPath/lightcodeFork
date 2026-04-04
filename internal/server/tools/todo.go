@@ -5,17 +5,17 @@ import (
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
 )
 
-func CreateTodo(ctx ToolContext, args map[string]any) (string, error) {
+func CreateTodo(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	raw, ok := args["descriptions"].([]any)
 	if !ok {
-		return "Error: descriptions is required and must be an array of strings", nil
+		return ToolResponse{Content: "Error: descriptions is required and must be an array of strings"}, nil
 	}
 
 	descriptions := make([]string, 0, len(raw))
 	for _, item := range raw {
 		s, ok := item.(string)
 		if !ok {
-			return "Error: each description must be a string", nil
+			return ToolResponse{Content: "Error: each description must be a string"}, nil
 		}
 		descriptions = append(descriptions, s)
 	}
@@ -26,19 +26,19 @@ func CreateTodo(ctx ToolContext, args map[string]any) (string, error) {
 	}
 	result := database.Model(&models.Session{}).Where("id = ?", ctx.SessionID).Update("to_do_list", models.EncodeToDoList(todos))
 	if result.Error != nil {
-		return "Error: failed to update todo list", nil
+		return ToolResponse{Content: "Error: failed to update todo list"}, nil
 	}
-	return "Todo list Created successfully", nil
+	return ToolResponse{Content: "Todo list Created successfully"}, nil
 }
 
-func UpdateTodo(ctx ToolContext, args map[string]any) (string, error) {
+func UpdateTodo(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	index, ok := args["index"].(int)
 	if !ok {
-		return "Error: index is required and must be an integer", nil
+		return ToolResponse{Content: "Error: index is required and must be an integer"}, nil
 	}
 	completed, ok := args["completed"].(bool)
 	if !ok {
-		return "Error: completed is required and must be a boolean", nil
+		return ToolResponse{Content: "Error: completed is required and must be a boolean"}, nil
 	}
 	database, _ := db.Connect()
 	var session models.Session
@@ -47,9 +47,9 @@ func UpdateTodo(ctx ToolContext, args map[string]any) (string, error) {
 	todos[index] = models.ToDo{Index: index, Description: todos[index].Description, Completed: completed}
 	result := database.Model(&models.Session{}).Where("id = ?", ctx.SessionID).Update("to_do_list", models.EncodeToDoList(todos))
 	if result.Error != nil {
-		return "Error: failed to update todo list", nil
+		return ToolResponse{Content: "Error: failed to update todo list"}, nil
 	}
-	return "Todo updated successfully: " + models.EncodeToDoList(todos), nil
+	return ToolResponse{Content: "Todo updated successfully: " + models.EncodeToDoList(todos)}, nil
 }
 
 func init() {

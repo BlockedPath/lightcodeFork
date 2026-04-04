@@ -5,29 +5,29 @@ import (
 	"path/filepath"
 )
 
-func WriteFile(ctx ToolContext, args map[string]any) (string, error) {
+func WriteFile(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	path, ok := args["path"].(string)
 	if !ok {
-		return "", nil
+		return ToolResponse{Content: "Error: path is required and must be a string"}, nil
 	}
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(ctx.WorkingDirectory, path)
 	}
 	content, ok := args["content"].(string)
 	if !ok {
-		return "", nil
+		return ToolResponse{Content: "Error: content is required and must be a string"}, nil
 	}
 
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return "", err
+		return ToolResponse{Content: "Error: " + err.Error()}, err
 	}
 
 	err := os.WriteFile(path, []byte(content), 0644)
 	if err != nil {
-		return "", err
+		return ToolResponse{Content: "Error: " + err.Error()}, err
 	}
-	return "File written successfully", nil
+	return ToolResponse{Content: "File written successfully", CodeChanges: []string{"", content}}, nil
 }
 
 func init() {

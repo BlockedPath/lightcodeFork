@@ -6,10 +6,10 @@ import (
 	"strings"
 )
 
-func ReadFile(ctx ToolContext, args map[string]any) (string, error) {
+func ReadFile(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	path, ok := args["path"].(string)
 	if !ok {
-		return "", nil
+		return ToolResponse{Content: "Error: path is required and must be a string"}, nil
 	}
 	offset, ok := args["offset"].(int)
 	if !ok {
@@ -27,13 +27,13 @@ func ReadFile(ctx ToolContext, args map[string]any) (string, error) {
 		files_to_ignore := strings.Split(string(gitignore), "\n")
 		for _, file := range files_to_ignore {
 			if strings.HasSuffix(path, file) {
-				return "Error: File is in .gitignore", nil
+				return ToolResponse{Content: "Error: File is in .gitignore"}, nil
 			}
 		}
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", err
+		return ToolResponse{Content: "Error: " + err.Error()}, err
 	}
 	content := string(data)
 	lines := strings.Split(content, "\n")
@@ -43,7 +43,7 @@ func ReadFile(ctx ToolContext, args map[string]any) (string, error) {
 	}
 	lines = lines[:limit]
 	content = strings.Join(lines, "\n")
-	return content, nil
+	return ToolResponse{Content: content}, nil
 }
 
 func init() {

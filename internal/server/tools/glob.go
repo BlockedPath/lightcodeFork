@@ -6,14 +6,14 @@ import (
 	"path/filepath"
 )
 
-func Glob(ctx ToolContext, args map[string]any) (string, error) {
+func Glob(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	pattern, ok := args["pattern"].(string)
 	if !ok {
-		return "", nil
+		return ToolResponse{Content: "Error: pattern is required and must be a string"}, nil
 	}
 	path, ok := args["path"].(string)
 	if !ok {
-		return "", nil
+		return ToolResponse{Content: "Error: path is required and must be a string"}, nil
 	}
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(ctx.WorkingDirectory, path)
@@ -22,9 +22,9 @@ func Glob(ctx ToolContext, args map[string]any) (string, error) {
 	cmd.Dir = ctx.WorkingDirectory
 	output, err := cmd.Output()
 	if err != nil {
-		return "No matches found", err
+		return ToolResponse{Content: "Error: " + err.Error()}, err
 	}
-	return string(output), nil
+	return ToolResponse{Content: string(output)}, nil
 }
 
 func init() {

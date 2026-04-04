@@ -6,21 +6,21 @@ import (
 	"strings"
 )
 
-func Edit(ctx ToolContext, args map[string]any) (string, error) {
+func Edit(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	path, ok := args["filePath"].(string)
 	if !ok {
-		return "", nil
+		return ToolResponse{Content: "Error: filePath is required and must be a string"}, nil
 	}
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(ctx.WorkingDirectory, path)
 	}
 	oldString, ok := args["oldString"].(string)
 	if !ok {
-		return "", nil
+		return ToolResponse{Content: "Error: oldString is required and must be a string"}, nil
 	}
 	newString, ok := args["newString"].(string)
 	if !ok {
-		return "", nil
+		return ToolResponse{Content: "Error: newString is required and must be a string"}, nil
 	}
 
 	var n int
@@ -38,27 +38,27 @@ func Edit(ctx ToolContext, args map[string]any) (string, error) {
 			n = 1
 		}
 	} else {
-		return "", nil
+		return ToolResponse{Content: "Error: replaceAll is required and must be an integer"}, nil
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", err
+		return ToolResponse{Content: "Error: " + err.Error()}, err
 	}
 	content := string(data)
 
 	// Check if oldString exists
 	if !strings.Contains(content, oldString) {
-		return "Old string not found in file", nil
+		return ToolResponse{Content: "Old string not found in file"}, nil
 	}
 
 	newContent := strings.Replace(content, oldString, newString, n)
 	err = os.WriteFile(path, []byte(newContent), 0644)
 	if err != nil {
-		return "", err
+		return ToolResponse{Content: "Error: " + err.Error()}, err
 	}
 
-	return strings.Join([]string{oldString, newString}, "\n"), nil
+	return ToolResponse{Content: strings.Join([]string{"old_string: ", oldString, "new_string: ", newString}, "\n"), CodeChanges: []string{oldString, newString}}, nil
 }
 
 func init() {
