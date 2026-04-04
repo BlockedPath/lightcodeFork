@@ -33,9 +33,9 @@ func CreateTodo(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 
 func UpdateTodo(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	index, ok := args["index"].(int)
-	if !ok {
-		return ToolResponse{Content: "Error: index is required and must be an integer"}, nil
-	}
+	// if !ok {
+	// 	return ToolResponse{Content: "Error: index is required and must be an integer"}, nil
+	// }
 	completed, ok := args["completed"].(bool)
 	if !ok {
 		return ToolResponse{Content: "Error: completed is required and must be a boolean"}, nil
@@ -77,7 +77,7 @@ func init() {
 			"type": "object",
 			"properties": map[string]any{
 				"index": map[string]any{
-					"type":        "int",
+					"type":        "integer",
 					"description": "The index of the todo to update",
 				},
 				"description": map[string]any{
