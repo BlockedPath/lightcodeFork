@@ -54,10 +54,11 @@ The agent streams responses over Server-Sent Events while tool calls and file op
 - [x] Make config files
 - [X] improve tools and make test
 - [x] Fix the database bug
+- [x] Limit accessible directory to working dir
 - [ ] File tracker - create a folder in ~/.lightcode/file_tracker and track in that
 - [ ] MCP - go mcp sdk with reference from other projects
 - [ ] todo tool
-- [ ] question tool - homepage 381, just need to create a ui and send chat completion request
+- [x] question tool - homepage 381, just need to create a ui and send chat completion request
 - [x] Show Code changes
 - [ ] Plan mode - prompt and tool filter
 - [ ] json data for model selection etc

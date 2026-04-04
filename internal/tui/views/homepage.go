@@ -74,6 +74,7 @@ type model struct {
 	questionIdx       int
 	questionAnswers   []string
 	questionSelected  int
+	todoList          []models.ToDo
 }
 
 func initialModel() model {
@@ -190,6 +191,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cur_idx := m.listSession.Current()
 				m.currentSession = m.sessions[cur_idx]
 				m.messages = client.GetSessionData(m.currentSession.ID)
+				m.todoList = client.GetCurrentTodoList(m.currentSession.ID)
 				m.islistSessionWin = false
 				m.syncLayout()
 				m.viewport.SetContent(renderMessages(m.messages, m.width))
@@ -413,6 +415,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case streamDoneMsg:
 		m.streamCh = nil
+		m.todoList = client.GetCurrentTodoList(m.currentSession.ID)
+		fmt.Println("+++++++++++++++++", "TODOLIST", m.todoList, "+++++++++++++++++")
 		m.isGenerating = false
 		m.syncLayout()
 		return m, nil
@@ -454,9 +458,7 @@ func (m model) View() tea.View {
 			sections = append(sections, m.spinner.View()+" Generating...")
 		}
 	}
-	// if time.Since(m.lastEsc) > m.escTimeout {
-	// 	sections = append(sections, "Click Esc again to cancel the generation")
-	// }
+
 	if m.islistCommandsWin {
 		sections = append(sections, m.listCommands.StringView())
 	}

@@ -77,7 +77,7 @@ func init() {
 			"type": "object",
 			"properties": map[string]any{
 				"index": map[string]any{
-					"type":        "number",
+					"type":        "int",
 					"description": "The index of the todo to update",
 				},
 				"description": map[string]any{

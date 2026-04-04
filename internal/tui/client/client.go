@@ -128,3 +128,16 @@ func DeleteSession(session_id string) {
 	body, _ := io.ReadAll(resp.Body)
 	fmt.Println(string(body))
 }
+
+func GetCurrentTodoList(session_id string) []models.ToDo {
+	resp, err := http.Get(baseUrl + "/get-current-todo-list?session_id=" + url.QueryEscape(session_id))
+	if err != nil {
+		fmt.Println(err.Error())
+		return []models.ToDo{}
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	var todoList []models.ToDo
+	json.Unmarshal(body, &todoList)
+	return todoList
+}

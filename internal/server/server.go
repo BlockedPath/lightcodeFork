@@ -24,6 +24,7 @@ func Initialise(ready chan<- struct{}, port string) {
 	http.HandleFunc("POST /send-message", sendMessage)
 	http.HandleFunc("POST /create-session", createSession)
 	http.HandleFunc("POST /delete-session", deleteSession)
+	http.HandleFunc("GET /get-current-todo-list", getCurrentTodoList)
 	// http.ListenAndServe(":8080", nil)
 
 	ln, err := net.Listen("tcp", ":"+port)
@@ -105,6 +106,30 @@ func chatcompletion(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Fprintf(w, "[DONE]\n")
 	flusher.Flush()
+}
+
+func getCurrentTodoList(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.URL.Query().Get("session_id")
+	if sessionID == "" {
+		http.Error(w, `{"error":"session_id required"}`, http.StatusBadRequest)
+		return
+	}
+	database, err := db.Connect()
+	if err != nil {
+		http.Error(w, `{"error":"database unavailable"}`, http.StatusInternalServerError)
+		return
+	}
+	var session models.Session
+	if err := database.Where("id = ?", sessionID).First(&session).Error; err != nil {
+		http.Error(w, `{"error":"session not found"}`, http.StatusNotFound)
+		return
+	}
+	todos := models.DecodeToDoList(session.ToDoList)
+	if todos == nil {
+		todos = []models.ToDo{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(todos)
 }
 
 func randomSessionID() string {
