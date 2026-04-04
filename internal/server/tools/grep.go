@@ -3,7 +3,6 @@ package tools
 import (
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 )
 
@@ -17,9 +16,11 @@ func Grep(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	if !ok {
 		return ToolResponse{Content: "Error: path is required and must be a string"}, nil
 	}
-	if !filepath.IsAbs(path) {
-		path = filepath.Join(ctx.WorkingDirectory, path)
+	resolved, err := ValidatePath(ctx, path)
+	if err != nil {
+		return ToolResponse{Content: "Error: " + err.Error()}, nil
 	}
+	path = resolved
 
 	include, ok := args["include"].(string)
 	if !ok {

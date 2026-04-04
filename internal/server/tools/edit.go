@@ -2,7 +2,6 @@ package tools
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -11,9 +10,11 @@ func Edit(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	if !ok {
 		return ToolResponse{Content: "Error: filePath is required and must be a string"}, nil
 	}
-	if !filepath.IsAbs(path) {
-		path = filepath.Join(ctx.WorkingDirectory, path)
+	resolved, err := ValidatePath(ctx, path)
+	if err != nil {
+		return ToolResponse{Content: "Error: " + err.Error()}, nil
 	}
+	path = resolved
 	oldString, ok := args["oldString"].(string)
 	if !ok {
 		return ToolResponse{Content: "Error: oldString is required and must be a string"}, nil

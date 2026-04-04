@@ -2,7 +2,6 @@ package tools
 
 import (
 	"os"
-	"path/filepath"
 )
 
 func ListDir(ctx ToolContext, args map[string]any) (ToolResponse, error) {
@@ -10,9 +9,11 @@ func ListDir(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	if !ok {
 		return ToolResponse{Content: "Error: path is required and must be a string"}, nil
 	}
-	if !filepath.IsAbs(path) {
-		path = filepath.Join(ctx.WorkingDirectory, path)
+	resolved, err := ValidatePath(ctx, path)
+	if err != nil {
+		return ToolResponse{Content: "Error: " + err.Error()}, nil
 	}
+	path = resolved
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return ToolResponse{Content: "Error: " + err.Error()}, err

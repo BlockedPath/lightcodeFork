@@ -2,6 +2,9 @@ package tools
 
 import (
 	"encoding/json"
+	"fmt"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/openai/openai-go/v3"
@@ -108,6 +111,24 @@ func GetToolsForChat() []openai.ChatCompletionToolUnionParam {
 		})
 	}
 	return result
+}
+
+func ValidatePath(ctx ToolContext, path string) (string, error) {
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(ctx.WorkingDirectory, path)
+	}
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		resolved = filepath.Clean(path)
+	}
+	allowedDir, err := filepath.EvalSymlinks(ctx.WorkingDirectory)
+	if err != nil {
+		allowedDir = filepath.Clean(ctx.WorkingDirectory)
+	}
+	if !strings.HasPrefix(resolved, allowedDir+string(filepath.Separator)) && resolved != allowedDir {
+		return "", fmt.Errorf("access denied: path %q is outside the allowed working directory %q", path, ctx.WorkingDirectory)
+	}
+	return resolved, nil
 }
 
 func ParseArgs(raw string) (map[string]any, error) {

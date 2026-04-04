@@ -19,9 +19,11 @@ func ReadFile(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	if !ok {
 		limit = 1000
 	}
-	if !filepath.IsAbs(path) {
-		path = filepath.Join(ctx.WorkingDirectory, path)
+	resolved, err := ValidatePath(ctx, path)
+	if err != nil {
+		return ToolResponse{Content: "Error: " + err.Error()}, nil
 	}
+	path = resolved
 	gitignore, err := os.ReadFile(filepath.Join(ctx.WorkingDirectory, ".gitignore"))
 	if err == nil {
 		files_to_ignore := strings.Split(string(gitignore), "\n")

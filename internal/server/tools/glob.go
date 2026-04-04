@@ -3,7 +3,6 @@ package tools
 import (
 	"fmt"
 	"os/exec"
-	"path/filepath"
 )
 
 func Glob(ctx ToolContext, args map[string]any) (ToolResponse, error) {
@@ -15,9 +14,11 @@ func Glob(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	if !ok {
 		return ToolResponse{Content: "Error: path is required and must be a string"}, nil
 	}
-	if !filepath.IsAbs(path) {
-		path = filepath.Join(ctx.WorkingDirectory, path)
+	resolved, err := ValidatePath(ctx, path)
+	if err != nil {
+		return ToolResponse{Content: "Error: " + err.Error()}, nil
 	}
+	path = resolved
 	cmd := exec.Command("find", path, "-name", fmt.Sprintf("%s", pattern))
 	cmd.Dir = ctx.WorkingDirectory
 	output, err := cmd.Output()

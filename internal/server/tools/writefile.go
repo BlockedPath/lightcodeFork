@@ -1,8 +1,10 @@
 package tools
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func WriteFile(ctx ToolContext, args map[string]any) (ToolResponse, error) {
@@ -12,6 +14,11 @@ func WriteFile(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	}
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(ctx.WorkingDirectory, path)
+	}
+	cleanPath := filepath.Clean(path)
+	allowedDir := filepath.Clean(ctx.WorkingDirectory)
+	if !strings.HasPrefix(cleanPath, allowedDir+string(filepath.Separator)) && cleanPath != allowedDir {
+		return ToolResponse{Content: fmt.Sprintf("Error: access denied: path %q is outside the allowed working directory %q", path, ctx.WorkingDirectory)}, nil
 	}
 	content, ok := args["content"].(string)
 	if !ok {
