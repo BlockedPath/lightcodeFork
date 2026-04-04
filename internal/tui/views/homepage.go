@@ -38,6 +38,11 @@ func LauchHomePage() {
 type streamMessageMsg models.StoredMessageData
 type streamDoneMsg struct{}
 
+type questionItem struct {
+	question string
+	options  []string
+}
+
 type model struct {
 	viewport          viewport.Model
 	islistSessionWin  bool
@@ -64,7 +69,11 @@ type model struct {
 	isGenerating      bool
 	lastEsc           time.Time
 	showEscMsg        bool
-	// escTimeout        time.Duration
+	questionMode      bool
+	questions         []questionItem
+	questionIdx       int
+	questionAnswers   []string
+	questionSelected  int
 }
 
 func initialModel() model {
@@ -158,6 +167,9 @@ func (m *model) syncLayout() {
 	if m.bashMode {
 		reservedHeight++
 	}
+	if m.questionMode {
+		reservedHeight += m.questionUIHeight()
+	}
 
 	viewportHeight := m.height - reservedHeight
 	if viewportHeight < 1 {
@@ -235,6 +247,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.viewport.GotoBottom()
 	case tea.KeyPressMsg:
+		if m.questionMode {
+			return m.handleQuestionInput(msg)
+		}
 		switch msg.String() {
 		case "ctrl+c":
 			fmt.Println(m.textarea.Value())
@@ -374,8 +389,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.syncLayout()
 		m.viewport.GotoBottom()
 		if msg.Role == "question" {
-			m.bashMode = true
-			// return m, streamDoneMsg
+			questions := parseQuestions(msg.Content)
+			if len(questions) > 0 {
+				m.questionMode = true
+				m.questions = questions
+				m.questionIdx = 0
+				m.questionAnswers = make([]string, len(questions))
+				m.questionSelected = 0
+				m.textarea.SetValue("")
+				m.textarea.Reset()
+				if len(questions[0].options) > 0 {
+					m.textarea.Placeholder = "↑↓ select · Enter confirm"
+					m.textarea.Blur()
+				} else {
+					m.textarea.Placeholder = "Type your answer..."
+					m.textarea.Focus()
+				}
+				m.isGenerating = false
+				m.syncLayout()
+			}
 		}
 		return m, waitForMessages(m.streamCh)
 
@@ -407,6 +439,10 @@ func (m model) View() tea.View {
 		sections = append(sections, "Bash Mode")
 	}
 	sections = append(sections, m.viewport.View())
+
+	if m.questionMode {
+		sections = append(sections, m.renderQuestionUI())
+	}
 
 	textareaSectionIndex := len(sections)
 	sections = append(sections, m.textarea.View())
@@ -700,6 +736,15 @@ func renderMessages(msgs []models.Message, width int) string {
 				lines = append(lines, "")
 				lines = append(lines, styleUser.Width(width).Render("> "+content))
 				lines = append(lines, "")
+			case "question":
+				qs := parseQuestions(content)
+				for _, q := range qs {
+					line := styleQuestionHeader.Render("? " + q.question)
+					if len(q.options) > 0 {
+						line += styleTree.Render(" [" + strings.Join(q.options, ", ") + "]")
+					}
+					lines = append(lines, line)
+				}
 			}
 		} else if d.Role == "assistant" && len(d.ToolCalls) > 0 {
 			// Assistant message with ONLY tool calls (no text content)
@@ -788,6 +833,151 @@ func CmdHandler(cmd string, m *model) tea.Cmd {
 
 func BashModeHandler(cmd string) {
 
+}
+
+func parseQuestions(content string) []questionItem {
+	var args map[string]any
+	if err := json.Unmarshal([]byte(content), &args); err != nil {
+		return nil
+	}
+	rawQuestions, ok := args["question"].([]any)
+	if !ok {
+		return nil
+	}
+	var questions []questionItem
+	for _, item := range rawQuestions {
+		obj, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		q := questionItem{}
+		q.question, _ = obj["question"].(string)
+		if rawOpts, ok := obj["options"].([]any); ok {
+			for _, o := range rawOpts {
+				if s, ok := o.(string); ok {
+					q.options = append(q.options, s)
+				}
+			}
+		}
+		if q.question != "" {
+			questions = append(questions, q)
+		}
+	}
+	return questions
+}
+
+var (
+	styleQuestionHeader = lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Bold(true)
+	styleOptionNormal   = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	styleOptionSelected = lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Bold(true)
+)
+
+func (m model) renderQuestionUI() string {
+	if !m.questionMode || m.questionIdx >= len(m.questions) {
+		return ""
+	}
+	q := m.questions[m.questionIdx]
+	var lines []string
+	header := fmt.Sprintf("? (%d/%d) %s", m.questionIdx+1, len(m.questions), q.question)
+	lines = append(lines, styleQuestionHeader.Render(header))
+	for i, opt := range q.options {
+		if i == m.questionSelected {
+			lines = append(lines, styleOptionSelected.Render("  ▸ "+opt))
+		} else {
+			lines = append(lines, styleOptionNormal.Render("    "+opt))
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m model) questionUIHeight() int {
+	if !m.questionMode || m.questionIdx >= len(m.questions) {
+		return 0
+	}
+	h := 1
+	h += len(m.questions[m.questionIdx].options)
+	return h
+}
+
+func (m model) handleQuestionInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "ctrl+c":
+		return m, tea.Quit
+	case "esc":
+		m.questionMode = false
+		m.textarea.Placeholder = "Send a message..."
+		m.textarea.Focus()
+		m.syncLayout()
+		return m, nil
+	case "enter":
+		q := m.questions[m.questionIdx]
+		if len(q.options) > 0 {
+			m.questionAnswers[m.questionIdx] = q.options[m.questionSelected]
+		} else {
+			m.questionAnswers[m.questionIdx] = m.textarea.Value()
+			m.textarea.SetValue("")
+			m.textarea.Reset()
+		}
+		m.questionIdx++
+		if m.questionIdx >= len(m.questions) {
+			return m.submitQuestionAnswers()
+		}
+		m.questionSelected = 0
+		next := m.questions[m.questionIdx]
+		if len(next.options) > 0 {
+			m.textarea.Placeholder = "↑↓ select · Enter confirm"
+			m.textarea.Blur()
+		} else {
+			m.textarea.Placeholder = "Type your answer..."
+			m.textarea.Focus()
+		}
+		m.syncLayout()
+		return m, nil
+	case "up":
+		if len(m.questions[m.questionIdx].options) > 0 && m.questionSelected > 0 {
+			m.questionSelected--
+		}
+		return m, nil
+	case "down":
+		q := m.questions[m.questionIdx]
+		if len(q.options) > 0 && m.questionSelected < len(q.options)-1 {
+			m.questionSelected++
+		}
+		return m, nil
+	default:
+		if len(m.questions[m.questionIdx].options) == 0 {
+			var cmd tea.Cmd
+			m.textarea, cmd = m.textarea.Update(msg)
+			return m, cmd
+		}
+		return m, nil
+	}
+}
+
+func (m model) submitQuestionAnswers() (tea.Model, tea.Cmd) {
+	m.questionMode = false
+	m.textarea.Placeholder = "Send a message..."
+	m.textarea.Focus()
+
+	var parts []string
+	for i, q := range m.questions {
+		parts = append(parts, fmt.Sprintf("Q: %s\nA: %s", q.question, m.questionAnswers[i]))
+	}
+	answer := strings.Join(parts, "\n\n")
+
+	newMessage := client.SendMessage(m.currentSession.ID, answer)
+	m.messages = append(m.messages, newMessage)
+	m.viewport.SetContent(renderMessages(m.messages, m.width))
+
+	m.isGenerating = true
+	m.syncLayout()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	ch := client.ChatCompletion(ctx, m.currentSession.ID, answer)
+	m.cancelStream = cancel
+	m.streamCh = ch
+	m.viewport.GotoBottom()
+	return m, tea.Batch(waitForMessages(ch), m.spinner.Tick)
 }
 
 func mascott() string {
