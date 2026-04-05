@@ -1,6 +1,9 @@
 package tools
 
 import (
+	"fmt"
+	"math"
+
 	"github.com/Kartik-2239/lightcode/internal/server/db"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
 )
@@ -32,10 +35,22 @@ func CreateTodo(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 }
 
 func UpdateTodo(ctx ToolContext, args map[string]any) (ToolResponse, error) {
-	index, ok := args["index"].(int)
-	// if !ok {
-	// 	return ToolResponse{Content: "Error: index is required and must be an integer"}, nil
-	// }
+	// JSON numbers are decoded as float64 into map[string]any (see ParseArgs / json.Unmarshal).
+	var index int
+	switch v := args["index"].(type) {
+	case float64:
+		if v != math.Trunc(v) || v < 0 || v > float64(math.MaxInt) {
+			return ToolResponse{Content: "Error: index is required and must be a non-negative integer"}, nil
+		}
+		index = int(v)
+	case int:
+		if v < 0 {
+			return ToolResponse{Content: "Error: index is required and must be a non-negative integer"}, nil
+		}
+		index = v
+	default:
+		return ToolResponse{Content: "Error: index is required and must be an integer"}, nil
+	}
 	completed, ok := args["completed"].(bool)
 	if !ok {
 		return ToolResponse{Content: "Error: completed is required and must be a boolean"}, nil
@@ -44,6 +59,9 @@ func UpdateTodo(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	var session models.Session
 	database.Model(&models.Session{}).Where("id = ?", ctx.SessionID).First(&session)
 	todos := models.DecodeToDoList(session.ToDoList)
+	if index < 0 || index >= len(todos) {
+		return ToolResponse{Content: fmt.Sprintf("Error: index %d is out of range (list has %d items)", index, len(todos))}, nil
+	}
 	todos[index] = models.ToDo{Index: index, Description: todos[index].Description, Completed: completed}
 	result := database.Model(&models.Session{}).Where("id = ?", ctx.SessionID).Update("to_do_list", models.EncodeToDoList(todos))
 	if result.Error != nil {
@@ -72,7 +90,7 @@ func init() {
 	}, CreateTodo)
 	Register("update_todo", ToolDef{
 		Name:        "update_todo",
-		Description: "Update a todo by providing an index and a description",
+		Description: "Update a todo by providing an index and a completed boolean, only provide the data of a specific item in the list not all the fucking items in the list, only ONE AT A TIME.",
 		Params: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -80,16 +98,12 @@ func init() {
 					"type":        "integer",
 					"description": "The index of the todo to update",
 				},
-				"description": map[string]any{
-					"type":        "string",
-					"description": "The description of the todo",
-				},
 				"completed": map[string]any{
 					"type":        "boolean",
 					"description": "The completed status of the todo",
 				},
 			},
-			"required": []string{"index", "description", "completed"},
+			"required": []string{"index", "completed"},
 		},
 	}, UpdateTodo)
 }

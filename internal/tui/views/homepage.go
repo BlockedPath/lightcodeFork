@@ -517,11 +517,9 @@ var (
 			PaddingLeft(1)
 	styleTodoTitle = lipgloss.NewStyle().Foreground(lipgloss.Color("86")).Bold(true)
 	styleTodoEmpty = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true)
-	styleTodoDone  = lipgloss.NewStyle().Foreground(lipgloss.Color("114")).Strikethrough(true)
-	styleTodoOpen  = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	styleTodoDone  = lipgloss.NewStyle().Foreground(lipgloss.Color("247")).Strikethrough(true)
+	styleTodoOpen  = lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
 	styleTodoBox   = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("238")).
 			Padding(0, 1).
 			MarginLeft(2)
 )
@@ -538,7 +536,7 @@ func withoutEphemeralTodoStatus(msgs []models.Message) []models.Message {
 }
 
 func renderTodoStatusBlock(dot string, todos []models.ToDo, width int) string {
-	title := styleTodoTitle.Render("Task list")
+	title := styleTodoTitle.Render("Todo list")
 	boxStyle := styleTodoBox
 	if width > 8 {
 		boxStyle = boxStyle.MaxWidth(width - 4)
@@ -547,18 +545,18 @@ func renderTodoStatusBlock(dot string, todos []models.ToDo, width int) string {
 	if len(todos) == 0 {
 		inner.WriteString(styleTodoEmpty.Render("No tasks in this session."))
 	} else {
-		for i, t := range todos {
-			prefix := "├ "
-			if i == len(todos)-1 {
-				prefix = "└ "
-			}
-			mark := lipgloss.NewStyle().Foreground(lipgloss.Color("243")).Render("[ ] ")
+		for _, t := range todos {
+			// prefix := "├ "
+			// if i == len(todos)-1 {
+			// 	prefix = "└ "
+			// }
+			mark := lipgloss.NewStyle().Foreground(lipgloss.Color("86")).Render("[ ] ")
 			line := styleTodoOpen.Render(t.Description)
 			if t.Completed {
-				mark = lipgloss.NewStyle().Foreground(lipgloss.Color("114")).Render("[✓] ")
+				mark = lipgloss.NewStyle().Foreground(lipgloss.Color("247")).Render("[x] ")
 				line = styleTodoDone.Render(t.Description)
 			}
-			inner.WriteString(styleTree.Render(prefix) + mark + line + "\n")
+			inner.WriteString(mark + line + "\n")
 		}
 	}
 	boxed := boxStyle.Render(strings.TrimSuffix(inner.String(), "\n"))
@@ -568,40 +566,45 @@ func renderTodoStatusBlock(dot string, todos []models.ToDo, width int) string {
 func formatToolCall(tc models.StoredToolCall) string {
 	var args map[string]interface{}
 	err := json.Unmarshal([]byte(tc.Arguments), &args)
-	values := []string{}
-	for arg, value := range args {
-		values = append(values, arg+": "+strings.TrimSpace(fmt.Sprintf("%v", value)))
+	values := ""
+	for _, value := range args {
+		values = values + strings.TrimSpace(fmt.Sprintf("%v", value)) + ", "
 	}
 	if err != nil {
 		return styleToolName.Render(tc.Name) + "()"
 	}
-	if len(values) > 7 {
-		values = values[:7]
-		values = append(values, values[7]+"...")
+	if tc.Name == "write_file" || tc.Name == "edit" || tc.Name == "skill" {
+		return styleToolName.Render(tc.Name)
 	}
-	return styleToolName.Render(tc.Name) + "(" + styleTree.Render(strings.Join(values, ", ")) + ")"
+	// if strings.Contains(tc.Name, "todo") {
+	// 	return ""
+	// }
+	return styleToolName.Render(tc.Name) + "(" + styleTree.Render(values) + ")"
 }
 
-func formatToolResult(content string, codeChanges []string, width int) string {
+func formatToolResult(content string, codeChanges []string, width int, tc models.StoredToolCall) string {
 	content = strings.TrimSpace(content)
 	if content == "" {
 		return styleResultText.Render("(no output)")
+	}
+	if strings.Contains(tc.Name, "todo") {
+		return renderTodoStatusBlock(styleDot.Render("●"), models.DecodeToDoList(content), width)
 	}
 	if len(codeChanges) == 0 {
 		lines := strings.Split(content, "\n")
 		if len(lines) <= 4 {
 			return styleResultText.Render(content)
 		}
-		return styleTree.Render(strings.Join(lines[:4], "\n") + "...")
+		return styleTree.Render(strings.Join(lines[:4], "\n") + "\n...")
 	}
 
 	var sb strings.Builder
 	sb.WriteString("\n")
-	oldlines := strings.Split(codeChanges[0], "\n")
+	oldlines := strings.Split(codeChanges[1], "\n")
 	if len(oldlines) > 4 {
 		oldlines = oldlines[:4]
 	}
-	newlines := strings.Split(codeChanges[1], "\n")
+	newlines := strings.Split(codeChanges[0], "\n")
 	if len(newlines) > 4 {
 		newlines = newlines[:4]
 	}
@@ -801,11 +804,14 @@ func renderMessages(msgs []models.Message, width int) string {
 
 			case "tool_call":
 				// For tool results, render BOTH the call and the result
-				if len(d.ToolCalls) > 0 {
-					lines = append(lines, dot+" "+formatToolCall(d.ToolCalls[0]))
+				for _, toolcall := range d.ToolCalls {
+					lines = append(lines, dot+" "+formatToolCall(toolcall))
+					resultSummary := formatToolResult(content, d.CodeChanges, width, toolcall)
+					lines = append(lines, tree+" "+resultSummary)
 				}
-				resultSummary := formatToolResult(content, d.CodeChanges, width)
-				lines = append(lines, tree+" "+resultSummary)
+				// if len(d.ToolCalls) > 0 {
+				// 	lines = append(lines, dot+" "+formatToolCall(d.ToolCalls[0]))
+				// }
 
 			case "user":
 				lines = append(lines, "")

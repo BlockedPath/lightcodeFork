@@ -86,7 +86,10 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode 
 					chats = append(chats, llm.Chat{Role: d.Role, Content: d.Content})
 				}
 			}
-			resp := llm.ApiCall(ctx, "", chats, mode)
+			var session models.Session
+			database.Where("id = ?", session_id).First(&session)
+			cur_list := session.ToDoList
+			resp := llm.ApiCall(ctx, cur_list, chats, mode)
 			select {
 			case <-ctx.Done():
 				return
