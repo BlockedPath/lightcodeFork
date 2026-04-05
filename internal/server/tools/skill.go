@@ -1,14 +1,12 @@
 package tools
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/Kartik-2239/lightcode/internal/server/config"
-	"github.com/joho/godotenv"
 )
 
 func Skill(ctx ToolContext, args map[string]any) (ToolResponse, error) {
@@ -16,13 +14,8 @@ func Skill(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	if !ok {
 		return ToolResponse{Content: "Error: skillName is required and must be a string"}, nil
 	}
-	skillPath := os.Getenv("SKILL_PATH")
-	if skillPath == "" {
-		return ToolResponse{Content: "Skill path not found"}, nil
-	}
-	fmt.Println("Skill path", skillPath)
+	skillPath := config.SkillsPath()
 	skillFilePath := filepath.Join(skillPath, skillName, "SKILL.md")
-	fmt.Println("Skill file path", skillFilePath)
 	data, err := os.ReadFile(skillFilePath)
 	if err != nil {
 		return ToolResponse{Content: "Skill not found"}, err
@@ -52,7 +45,6 @@ func Skill(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 }
 
 func init() {
-	godotenv.Load(config.EnvPath())
 	Register("skill", ToolDef{
 		Name:        "skill",
 		Description: "Load a skill from the available skills using skill name",

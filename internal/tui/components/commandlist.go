@@ -72,7 +72,6 @@ func initialModel() ModelCmdList {
 	items := []list.Item{
 		item("sessions"),
 		item("new_session"),
-		item("mcp"),
 		item("rename_session"),
 		item("delete_session"),
 		item("skills"),
@@ -129,12 +128,6 @@ func (m ModelCmdList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyPressMsg:
 		switch keypress := msg.String(); keypress {
-		// case "enter":
-		// 	i, ok := m.list.SelectedItem().(item)
-		// 	if ok {
-		// 		m.choice = string(i)
-		// 	}
-		// 	return m, nil
 		case "up", "down":
 			var cmd tea.Cmd
 			m.list, cmd = m.list.Update(msg)

@@ -2,23 +2,22 @@ package prompt
 
 import (
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/Kartik-2239/lightcode/internal/server/config"
-	"github.com/joho/godotenv"
 )
 
 func AvailableSkills() string {
-	godotenv.Load(config.EnvPath())
-	skillPath := os.Getenv("SKILL_PATH")
+	skillPath := config.SkillsPath()
 	skill_data := []string{}
 	files, err := os.ReadDir(skillPath)
 	if err != nil {
-		return ""
+		return "Error: " + err.Error()
 	}
 	for _, file := range files {
-		data, err := os.ReadFile(skillPath + "/" + file.Name() + "/SKILL.md")
+		data, err := os.ReadFile(filepath.Join(skillPath, file.Name(), "SKILL.md"))
 		if err != nil {
 			continue
 		}

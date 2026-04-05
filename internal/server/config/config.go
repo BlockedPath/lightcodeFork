@@ -12,6 +12,10 @@ func Dir() string {
 	return dir
 }
 
+func SkillsPath() string {
+	return filepath.Join(Dir(), "skills")
+}
+
 func DBPath() string {
 	return filepath.Join(Dir(), "lightcode.db")
 }

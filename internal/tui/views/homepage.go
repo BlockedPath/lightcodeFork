@@ -21,6 +21,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/glamour/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/Kartik-2239/lightcode/internal/server/config"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
 	"github.com/Kartik-2239/lightcode/internal/tui/client"
 	"github.com/Kartik-2239/lightcode/internal/tui/components"
@@ -76,6 +77,9 @@ type model struct {
 	questionSelected  int
 	todoList          []models.ToDo
 	mode              string
+	modelsList        []config.Model
+	isModelsListWin   bool
+	modelsListIndex   int
 }
 
 func initialModel() model {
@@ -126,6 +130,20 @@ func initialModel() model {
 	spin.Spinner = spinner.MiniDot
 	spin.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
+	modelsList, err := config.GetModels()
+	if err != nil {
+		modelsList = []config.Model{}
+	}
+
+	currentModel := config.GetCurrentModel()
+	currentModelIndex := 0
+	for i, model := range modelsList {
+		if model.Model == currentModel.Model {
+			currentModelIndex = i
+			break
+		}
+	}
+
 	m := model{
 		textarea:          ta,
 		pasteCounter:      0,
@@ -147,6 +165,9 @@ func initialModel() model {
 		isGenerating:      false,
 		lastEsc:           time.Now(),
 		mode:              "chat",
+		modelsList:        modelsList,
+		isModelsListWin:   false,
+		modelsListIndex:   currentModelIndex,
 	}
 	m.syncLayout()
 	return m
@@ -167,6 +188,9 @@ func (m *model) syncLayout() {
 	if m.mode == "chat" || m.mode == "plan" {
 		reservedHeight++
 	}
+	if m.modelsListIndex < len(m.modelsList) {
+		reservedHeight++
+	}
 	if m.islistCommandsWin {
 		reservedHeight += m.listCommands.Height()
 	}
@@ -175,6 +199,9 @@ func (m *model) syncLayout() {
 	}
 	if m.questionMode {
 		reservedHeight += m.questionUIHeight()
+	}
+	if m.isModelsListWin {
+		reservedHeight += m.modelsListHeight()
 	}
 
 	viewportHeight := m.height - reservedHeight
@@ -256,6 +283,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		if m.questionMode {
 			return m.handleQuestionInput(msg)
+		}
+		if m.isModelsListWin {
+			return m.handleModelsListInput(msg)
 		}
 		switch msg.String() {
 		case "ctrl+c":
@@ -472,7 +502,13 @@ func (m model) View() tea.View {
 	if m.questionMode {
 		sections = append(sections, m.renderQuestionUI())
 	}
+	if m.isModelsListWin {
+		sections = append(sections, m.renderModelsList())
+	}
+
 	sections = append(sections, m.mode)
+	sections = append(sections, m.modelsList[m.modelsListIndex].Model)
+
 	textareaSectionIndex := len(sections)
 	sections = append(sections, m.textarea.View())
 
@@ -490,7 +526,9 @@ func (m model) View() tea.View {
 
 	v := tea.NewView(strings.Join(sections, "\n"))
 	c := m.textarea.Cursor()
-	if c != nil {
+	if m.isModelsListWin {
+		c = nil
+	} else if c != nil {
 		if textareaSectionIndex > 0 {
 			c.Y += lipgloss.Height(strings.Join(sections[:textareaSectionIndex], "\n"))
 		}
@@ -911,6 +949,20 @@ func CmdHandler(cmd string, m *model) tea.Cmd {
 		m.textarea.Reset()
 		m.viewport.GotoBottom()
 		return func() tea.Msg { return refreshSessionsMsg{} }
+
+	case "/models":
+		m.textarea.Reset()
+		list, err := config.GetModels()
+		if err != nil {
+			list = []config.Model{}
+		}
+		m.modelsList = list
+		m.modelsListIndex = 0
+		m.isModelsListWin = true
+		m.textarea.Placeholder = "↑↓ select · Enter/Esc close"
+		m.textarea.Blur()
+		m.syncLayout()
+		return nil
 	}
 	return nil
 }
@@ -919,6 +971,39 @@ func BashModeHandler(cmd string) {
 
 }
 
+func (m model) handleModelsListInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "ctrl+c":
+		return m, tea.Quit
+	case "esc", "enter":
+		m.isModelsListWin = false
+		m.textarea.Placeholder = "Send a message..."
+		config.SetCurrentModel(m.modelsList[m.modelsListIndex])
+		m.textarea.Focus()
+		(&m).syncLayout()
+		return m, nil
+	case "up":
+		if len(m.modelsList) == 0 {
+			return m, nil
+		}
+		m.modelsListIndex--
+		if m.modelsListIndex < 0 {
+			m.modelsListIndex = len(m.modelsList) - 1
+		}
+		return m, nil
+	case "down":
+		if len(m.modelsList) == 0 {
+			return m, nil
+		}
+		m.modelsListIndex++
+		if m.modelsListIndex >= len(m.modelsList) {
+			m.modelsListIndex = 0
+		}
+		return m, nil
+	default:
+		return m, nil
+	}
+}
 func parseQuestions(content string) []questionItem {
 	var args map[string]any
 	if err := json.Unmarshal([]byte(content), &args); err != nil {
@@ -955,6 +1040,31 @@ var (
 	styleOptionNormal   = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	styleOptionSelected = lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Bold(true)
 )
+
+func (m model) renderModelsList() string {
+	header := styleQuestionHeader.Render("Models")
+	lines := []string{header}
+	if len(m.modelsList) == 0 {
+		lines = append(lines, styleOptionNormal.Render(" no models configured"))
+		return strings.Join(lines, "\n")
+	}
+	for i, ent := range m.modelsList {
+		label := ent.Model
+		if i == m.modelsListIndex {
+			lines = append(lines, styleOptionSelected.Render("  ▸ "+label))
+		} else {
+			lines = append(lines, styleOptionNormal.Render("    "+label))
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m model) modelsListHeight() int {
+	if len(m.modelsList) == 0 {
+		return 2
+	}
+	return 1 + len(m.modelsList)
+}
 
 func (m model) renderQuestionUI() string {
 	if !m.questionMode || m.questionIdx >= len(m.questions) {
