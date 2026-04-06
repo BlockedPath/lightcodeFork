@@ -26,8 +26,9 @@ type ToolCall struct {
 }
 
 type Chat struct {
-	Role    string
-	Content string
+	Role       string
+	Content    string
+	ToolCallID string
 }
 
 func ApiCall(ctx context.Context, input string, chats []Chat, mode string) Response {
@@ -48,6 +49,8 @@ func ApiCall(ctx context.Context, input string, chats []Chat, mode string) Respo
 			messages = append(messages, openai.UserMessage(c.Content))
 		case "assistant":
 			messages = append(messages, openai.AssistantMessage(c.Content))
+		case "tool":
+			messages = append(messages, openai.ToolMessage(c.Content, c.ToolCallID))
 		}
 	}
 	if input != "" {

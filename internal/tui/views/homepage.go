@@ -188,9 +188,6 @@ func (m *model) syncLayout() {
 	if m.mode == "chat" || m.mode == "plan" {
 		reservedHeight++
 	}
-	if m.modelsListIndex < len(m.modelsList) {
-		reservedHeight++
-	}
 	if m.islistCommandsWin {
 		reservedHeight += m.listCommands.Height()
 	}
@@ -506,11 +503,15 @@ func (m model) View() tea.View {
 		sections = append(sections, m.renderModelsList())
 	}
 
-	sections = append(sections, m.mode)
-	sections = append(sections, m.modelsList[m.modelsListIndex].Model)
-
 	textareaSectionIndex := len(sections)
 	sections = append(sections, m.textarea.View())
+	if !m.islistCommandsWin {
+		if m.mode == "plan" {
+			sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.BrightMagenta).Bold(true).Render("Plan")+" "+lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Bold(false).Render(m.modelsList[m.modelsListIndex].Model))
+		} else {
+			sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.BrightBlue).Bold(true).Render("Chat")+" "+lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Bold(false).Render(m.modelsList[m.modelsListIndex].Model))
+		}
+	}
 
 	if m.isGenerating {
 		if m.showEscMsg {
@@ -657,7 +658,6 @@ func formatToolResult(content string, codeChanges []string, width int, tc models
 	return sb.String()
 }
 
-// lightcodeGlamourStyle is a custom glamour style tuned to match the app palette.
 var lightcodeGlamourStyle = []byte(`{
   "document": {
     "block_prefix": "",

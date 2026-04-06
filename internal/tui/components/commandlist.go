@@ -23,7 +23,7 @@ func newStyles(darkBG bool) styles {
 	var s styles
 	s.title = lipgloss.NewStyle().MarginLeft(2)
 	s.item = lipgloss.NewStyle().PaddingLeft(4)
-	s.selectedItem = lipgloss.NewStyle().PaddingLeft(2).Foreground(lipgloss.Color("170"))
+	s.selectedItem = lipgloss.NewStyle().PaddingLeft(2).Foreground(lipgloss.White)
 	s.pagination = list.DefaultStyles(darkBG).PaginationStyle.PaddingLeft(4)
 	s.help = list.DefaultStyles(darkBG).HelpStyle.PaddingLeft(4).PaddingBottom(1)
 	s.quitText = lipgloss.NewStyle().Margin(1, 0, 2, 4)
@@ -140,12 +140,6 @@ func (m ModelCmdList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m ModelCmdList) View() tea.View {
-	if m.choice != "" {
-		return tea.NewView(m.styles.quitText.Render(fmt.Sprintf("%s? Sounds good to me.", m.choice)))
-	}
-	if m.quitting {
-		return tea.NewView(m.styles.quitText.Render("Not hungry? That’s cool."))
-	}
 	return tea.NewView("\n" + m.list.View())
 }
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/Kartik-2239/lightcode/internal/server/db"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
@@ -74,14 +73,18 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode 
 					})
 				case "assistant":
 					content := d.Content
-					if content == "" && len(d.ToolCalls) > 0 {
-						names := make([]string, len(d.ToolCalls))
-						for j, tc := range d.ToolCalls {
-							names[j] = tc.Name
-						}
-						content = "(Calling tools: " + strings.Join(names, ", ") + ")"
-					}
 					chats = append(chats, llm.Chat{Role: "assistant", Content: content})
+					// if content == "" && len(d.ToolCalls) > 0 {
+					// 	names := make([]string, len(d.ToolCalls))
+					// 	for j, tc := range d.ToolCalls {
+					// 		names[j] = tc.Name + " (call_id=" + tc.ID + ")"
+					// 	}
+					// 	content = "(Called tools: " + strings.Join(names, ", ") + ")"
+					// } else {
+
+					// 	chats = append(chats, llm.Chat{Role: "assistant", Content: content})
+					// }
+
 				default:
 					chats = append(chats, llm.Chat{Role: d.Role, Content: d.Content})
 				}
@@ -89,7 +92,8 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode 
 			var session models.Session
 			database.Where("id = ?", session_id).First(&session)
 			cur_list := session.ToDoList
-			resp := llm.ApiCall(ctx, cur_list, chats, mode)
+			chats = append(chats, llm.Chat{Role: "user", Content: cur_list})
+			resp := llm.ApiCall(ctx, "", chats, mode)
 			select {
 			case <-ctx.Done():
 				return

@@ -61,8 +61,8 @@ The agent streams responses over Server-Sent Events while tool calls and file op
 - [x] json data for model selection etc
 
 - [ ] File tracker
-- [ ] Clean the frontend code and Make the ui consistent
 - [ ] Write Install script
+- [ ] need to also integrate anthropic go sdk cause response format for tool calling in models like glp and claude
 
 
 
