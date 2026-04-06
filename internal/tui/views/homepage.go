@@ -638,9 +638,9 @@ func formatToolResult(content string, codeChanges []string, width int, tc models
 	}
 
 	var sb strings.Builder
-	newlines := strings.Split(codeChanges[1], "\n")
-	oldlines := strings.Split(codeChanges[0], "\n")
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Green).Render(fmt.Sprintf("+%d", len(newlines))) + " " + lipgloss.NewStyle().Foreground(lipgloss.Red).Render(fmt.Sprintf("-%d", len(oldlines))) + "\n")
+	oldlines := strings.Split(codeChanges[1], "\n")
+	newlines := strings.Split(codeChanges[0], "\n")
+	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Red).Render(fmt.Sprintf("-%d", len(oldlines))) + " " + lipgloss.NewStyle().Foreground(lipgloss.Green).Render(fmt.Sprintf("+%d", len(newlines))) + "\n")
 
 	if len(newlines) > 4 {
 		newlines = newlines[:4]

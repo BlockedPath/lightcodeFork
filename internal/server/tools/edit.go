@@ -23,6 +23,7 @@ func Edit(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	if !ok {
 		return ToolResponse{Content: "Error: newString is required and must be a string"}, nil
 	}
+	copyNewString := newString
 
 	var n int
 	// JSON numbers are decoded as float64 into map[string]any
@@ -59,7 +60,7 @@ func Edit(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 		return ToolResponse{Content: "Error: " + err.Error()}, err
 	}
 
-	return ToolResponse{Content: strings.Join([]string{"old_string: ", oldString, "new_string: ", newString}, "\n"), CodeChanges: []string{newString, oldString}}, nil
+	return ToolResponse{Content: strings.Join([]string{"old_string: ", oldString, "new_string: ", copyNewString}, "\n"), CodeChanges: []string{oldString, copyNewString}}, nil
 }
 
 func init() {
