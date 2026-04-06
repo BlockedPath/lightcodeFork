@@ -1,4 +1,4 @@
-package main
+package lightcode
 
 import (
 	"net"
@@ -11,7 +11,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func main() {
+func Lightcode() {
 	godotenv.Load(config.EnvPath())
 	port := os.Getenv("PORT")
 	if port == "" {

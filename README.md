@@ -59,15 +59,10 @@ The agent streams responses over Server-Sent Events while tool calls and file op
 - [x] Plan mode - prompt and tool filter
 - [x] todo tool - handle in the ui and send it as context in agent.go 
 - [x] json data for model selection etc
+- [x] need to also integrate anthropic go sdk cause response format for tool calling in models like glp and claude (fixed without adding anthropic api)
+
 
 - [ ] File tracker
 - [ ] Write Install script
-- [ ] need to also integrate anthropic go sdk cause response format for tool calling in models like glp and claude
-
-
-
-
-
-
-
+- [ ] Context Compaction
 

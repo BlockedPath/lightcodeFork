@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const MaxIterations = 10
+const MaxIterations = 25
 const DEBUG = false
 
 type Agent struct{}

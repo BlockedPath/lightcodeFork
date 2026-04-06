@@ -69,6 +69,7 @@ func (m *Model) Refresh(items []models.Session) {
 	for i, s := range items {
 		sessionItems[i] = NewItem(s.Title, s.Directory)
 	}
+	sessionItems = reverse(sessionItems)
 	m.list.SetItems(sessionItems)
 }
 
@@ -79,6 +80,13 @@ func LaunchSessionList(items []list.Item) Model {
 	}
 	h, v := docStyle.GetFrameSize()
 	m := Model{list: list.New(items, list.NewDefaultDelegate(), width-h, height-v)}
-	m.list.Title = "Sessions"
+	m.list.Title = "lightcode Sessions"
 	return m
+}
+
+func reverse(arr []list.Item) []list.Item {
+	for i, j := 0, len(arr)-1; i < j; i, j = i+1, j-1 {
+		arr[i], arr[j] = arr[j], arr[i]
+	}
+	return arr
 }

@@ -923,6 +923,7 @@ func CmdHandler(cmd string, m *model) tea.Cmd {
 	switch cmd {
 	case "/sessions":
 		m.sessions = client.ListSession()
+		m.listSession.Refresh(m.sessions)
 		m.islistSessionWin = true
 		m.textarea.Reset()
 	case "/new_session":
