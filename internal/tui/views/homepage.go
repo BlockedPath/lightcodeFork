@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"html"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -345,7 +346,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.currentSession.ID == "" {
 				session_id := client.CreateSession((m.textarea.Value()))
 				m.currentSession = models.Session{ID: session_id, Title: m.textarea.Value(), Directory: "."}
+				client.Reverse(m.sessions)
 				m.sessions = append(m.sessions, m.currentSession)
+				client.Reverse(m.sessions)
 				m.listSession.Refresh(m.sessions)
 			}
 			m.isGenerating = true
@@ -600,7 +603,11 @@ func formatToolCall(tc models.StoredToolCall) string {
 	err := json.Unmarshal([]byte(tc.Arguments), &args)
 	values := ""
 	for _, value := range args {
-		values = values + strings.TrimSpace(fmt.Sprintf("%v", value)) + ", "
+		if filepath.IsAbs(value.(string)) {
+			home, _ := os.UserHomeDir()
+			value = strings.Replace(value.(string), home, "~", 1)
+		}
+		values = values + strings.TrimSpace(fmt.Sprintf("%v", value)) + " "
 	}
 	if err != nil {
 		return styleToolName.Render(tc.Name) + "()"
@@ -608,9 +615,6 @@ func formatToolCall(tc models.StoredToolCall) string {
 	if tc.Name == "write_file" || tc.Name == "edit" || tc.Name == "skill" {
 		return styleToolName.Render(tc.Name)
 	}
-	// if strings.Contains(tc.Name, "todo") {
-	// 	return ""
-	// }
 	return styleToolName.Render(tc.Name) + "(" + styleTree.Render(values) + ")"
 }
 
@@ -625,6 +629,8 @@ func formatToolResult(content string, codeChanges []string, width int, tc models
 	if len(codeChanges) == 0 {
 		lines := strings.Split(content, "\n")
 		if len(lines) <= 4 {
+			home, _ := os.UserHomeDir()
+			content = strings.Replace(content, home, "~", 1)
 			return styleResultText.Render(content)
 		}
 		return styleTree.Render(strings.Join(lines[:4], "\n") + "\n...")

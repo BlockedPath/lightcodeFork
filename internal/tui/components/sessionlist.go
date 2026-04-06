@@ -2,6 +2,7 @@ package components
 
 import (
 	"os"
+	"strings"
 
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
@@ -66,10 +67,12 @@ func (m Model) Current() int {
 
 func (m *Model) Refresh(items []models.Session) {
 	sessionItems := make([]list.Item, len(items))
+	home, _ := os.UserHomeDir()
 	for i, s := range items {
-		sessionItems[i] = NewItem(s.Title, s.Directory)
+		dir := strings.Replace(s.Directory, home, "~", 1)
+		sessionItems[i] = NewItem(s.Title, dir)
 	}
-	sessionItems = reverse(sessionItems)
+	// sessionItems = reverse(sessionItems)
 	m.list.SetItems(sessionItems)
 }
 
@@ -82,11 +85,4 @@ func LaunchSessionList(items []list.Item) Model {
 	m := Model{list: list.New(items, list.NewDefaultDelegate(), width-h, height-v)}
 	m.list.Title = "lightcode Sessions"
 	return m
-}
-
-func reverse(arr []list.Item) []list.Item {
-	for i, j := 0, len(arr)-1; i < j; i, j = i+1, j-1 {
-		arr[i], arr[j] = arr[j], arr[i]
-	}
-	return arr
 }

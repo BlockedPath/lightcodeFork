@@ -37,7 +37,15 @@ func ListSession() []models.Session {
 	body, _ := io.ReadAll(resp.Body)
 	var sessions []models.Session
 	json.Unmarshal(body, &sessions)
+	Reverse(sessions)
 	return sessions
+}
+
+func Reverse(arr []models.Session) []models.Session {
+	for i, j := 0, len(arr)-1; i < j; i, j = i+1, j-1 {
+		arr[i], arr[j] = arr[j], arr[i]
+	}
+	return arr
 }
 
 func GetSessionData(session_id string) []models.Message {

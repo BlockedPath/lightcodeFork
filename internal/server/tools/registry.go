@@ -129,7 +129,7 @@ func ValidatePath(ctx ToolContext, path string) (string, error) {
 		allowedDir = filepath.Clean(ctx.WorkingDirectory)
 	}
 	if !strings.HasPrefix(resolved, allowedDir+string(filepath.Separator)) && resolved != allowedDir {
-		return "", fmt.Errorf("access denied: path %q is outside the allowed working directory %q", path, ctx.WorkingDirectory)
+		return "", fmt.Errorf("Access denied: path %q is outside the allowed working directory %q", path, ctx.WorkingDirectory)
 	}
 	return resolved, nil
 }
