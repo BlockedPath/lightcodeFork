@@ -72,7 +72,6 @@ func initialModel() ModelCmdList {
 	items := []list.Item{
 		item("sessions"),
 		item("new_session"),
-		item("rename_session"),
 		item("delete_session"),
 		item("skills"),
 		item("editor"),

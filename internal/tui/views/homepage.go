@@ -392,13 +392,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// m.adjustTextareaHeight()
 
 			previousBashMode := m.bashMode
-			if strings.HasPrefix(m.textarea.Value(), "!") {
-				m.bashMode = true
-				BashModeHandler(m.textarea.Value())
-			} else {
-				m.bashMode = false
-				BashModeHandler(m.textarea.Value())
-			}
 			if previousBashMode != m.bashMode {
 				m.syncLayout()
 			}
@@ -966,10 +959,6 @@ func CmdHandler(cmd string, m *model) tea.Cmd {
 		return nil
 	}
 	return nil
-}
-
-func BashModeHandler(cmd string) {
-
 }
 
 func (m model) handleModelsListInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
