@@ -9,8 +9,6 @@ import (
 	"github.com/Kartik-2239/lightcode/internal/server/tools"
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
-
-	"github.com/joho/godotenv"
 )
 
 type Response struct {
@@ -32,7 +30,6 @@ type Chat struct {
 }
 
 func ApiCall(ctx context.Context, input string, chats []Chat, mode string) Response {
-	godotenv.Load(config.EnvPath())
 	var toolCalls []ToolCall
 	client := openai.NewClient(option.WithAPIKey(config.GetCurrentModel().ApiKey), option.WithBaseURL(config.GetCurrentModel().BaseUrl))
 
@@ -56,16 +53,17 @@ func ApiCall(ctx context.Context, input string, chats []Chat, mode string) Respo
 	if input != "" {
 		messages = append(messages, openai.UserMessage(input))
 	}
+	m := config.GetCurrentModel().Model
 	resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Messages: messages,
 		Tools:    tools.GetToolsForChat(),
-		Model:    "Minimax-M2.5",
+		Model:    m,
 	})
 	if mode == "plan" {
 		resp, err = client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 			Messages: messages,
 			Tools:    tools.GetToolsForPlan(),
-			Model:    "Minimax-M2.5",
+			Model:    m,
 		})
 	}
 

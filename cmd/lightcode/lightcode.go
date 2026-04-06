@@ -3,20 +3,14 @@ package lightcode
 import (
 	"net"
 	"net/http"
-	"os"
 
 	"github.com/Kartik-2239/lightcode/internal/server"
 	"github.com/Kartik-2239/lightcode/internal/server/config"
 	"github.com/Kartik-2239/lightcode/internal/tui/views"
-	"github.com/joho/godotenv"
 )
 
 func Lightcode() {
-	godotenv.Load(config.EnvPath())
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+	port := config.GetCustomization().ApiUrl
 	if !isPortInUse(port) {
 		_, err := http.Get("http://localhost:" + port)
 		if err != nil {

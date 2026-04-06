@@ -13,18 +13,12 @@ import (
 
 	"github.com/Kartik-2239/lightcode/internal/server/config"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
-	"github.com/joho/godotenv"
 )
 
 var baseUrl string
 
 func init() {
-	godotenv.Load(config.EnvPath())
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-	baseUrl = "http://localhost:" + port
+	baseUrl = config.GetCustomization().ApiUrl
 }
 
 func ListSession() []models.Session {

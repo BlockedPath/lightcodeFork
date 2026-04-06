@@ -7,7 +7,15 @@ import (
 	"path/filepath"
 )
 
+// ```bash
+// OPENAI_API_KEY=sk-...
+// OPENAI_BASE_URL=https://...
+// SKILL_PATH=path/to/skill/folder
+// API_URL=http://localhost:8080
+// ```
 type Customization struct {
+	SkillsPath   string  `json:"skills_path"`
+	ApiUrl       string  `json:"api_url"`
 	Theme        string  `json:"theme"`
 	Models       []Model `json:"models"`
 	CurrentModel Model   `json:"current_model"`
@@ -23,8 +31,10 @@ func CustomizationPath() (string, error) {
 	path := filepath.Join(Dir(), "config.json")
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		bare := Customization{
-			Theme:  "light",
-			Models: []Model{},
+			Theme:      "light",
+			SkillsPath: filepath.Join(Dir(), "skills"),
+			ApiUrl:     "http://localhost:8080",
+			Models:     []Model{},
 		}
 		d, err := json.Marshal(bare)
 		if err != nil {

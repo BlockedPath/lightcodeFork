@@ -13,13 +13,13 @@ func Dir() string {
 }
 
 func SkillsPath() string {
-	return filepath.Join(Dir(), "skills")
+	return GetCustomization().SkillsPath
 }
 
 func DBPath() string {
 	return filepath.Join(Dir(), "lightcode.db")
 }
 
-func EnvPath() string {
-	return filepath.Join(Dir(), ".env")
-}
+// func EnvPath() string {
+// 	return filepath.Join(Dir(), ".env")
+// }

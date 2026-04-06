@@ -1,23 +1,65 @@
 # Lightcode
 
-Lightcode is a **coding agent** written in Go. It supports all the llm providers that support OpenAi Api format.
+Lightcode is a light weight **coding agent** written in Go.
 
 ![Lightcode demo](assets/lightcode.gif)
 
 ## Requirements
 
 - [Go](https://go.dev/dl/) **1.25+**
-- An API key of any provider and their Base Url
+- At least one OpenAI-compatible endpoint configured (see **Models** below)
 
 ## Configuration
 
-Create a `.env` in the root of the project and set the values.
+Settings live under **`~/.lightcode/`**. The app creates this directory and a default **`config.json`** on first run.
+
+### Models
+
+Providers must speak the **OpenAI Chat Completions** API. Add entries to the `models` array in `~/.lightcode/config.json`. Each entry is an object with:
+
+| Field | Meaning |
+|--------|---------|
+| `model` | Model id as your provider expects it (e.g. `gpt-4o`) |
+| `base_url` | Base URL for the API (OpenAI-compatible) |
+| `api_key` | Secret for that provider |
+
+Example:
+
+```json
+{
+  "theme": "light",
+  "models": [
+    {
+      "model": "another-model-id",
+      "base_url": "https://your-gateway.example/v1",
+      "api_key": "..."
+    },
+    {
+      "model": "another-model-id-2",
+      "base_url": "https://your-gateway.example/v1",
+      "api_key": "..."
+    }
+  ],
+  "current_model": {
+      "model": "another-model-id",
+      "base_url": "https://your-gateway.example/v1",
+      "api_key": "..."
+    }
+}
+```
+
+- In the TUI, run **`/models`** to select one of the models
+
+### Skills (greatly improves performance)
+
+Put skills in **`~/.lightcode/skills/`**, each in its own subdirectory containing a **`SKILL.md`** file.
+
+### Server Url
+
+The HTTP API defaults to port **8080**. To use a different port, Set Api url in  `~/.lightcode/config.json`.
 
 ```bash
-OPENAI_API_KEY=sk-...
-OPENAI_BASE_URL=https://...
-SKILL_PATH=path/to/skill/folder
-API_URL=http://localhost:8080
+go run ./cmd/lightcode/main.go
 ```
 
 ## Quick start
@@ -28,19 +70,6 @@ Run the **API server** (by default listens on **`:8080`**) and **TUI**:
 go run ./cmd/lightcode/main.go
 ```
 
-The agent streams responses over Server-Sent Events while tool calls and file operations run on the server side.
-
-## What’s inside
-
-| Piece | Role |
-|--------|------|
-| `cmd/server` | HTTP API: sessions, messages, streaming chat completion |
-| `cmd/tui` | Bubble Tea frontend that calls the API |
-| `internal/server/agent` | Agent loop, message history, tool execution |
-| `internal/server/tools` | `read_file`, `write_file`, `edit`, `bash`, `grep`, `glob`, `list_dir`, `web_fetch`, `skill`, `todo` |
-| `internal/server/db` | GORM + SQLite (`lightcode.db`) for sessions and messages |
-
----
 
 ## Todo
 
@@ -63,7 +92,6 @@ The agent streams responses over Server-Sent Events while tool calls and file op
 
 
 - [ ] File tracker
-- [ ] Write Install script
 - [ ] Re write prompts
 - [ ] Check for credentials before making an api call
 
