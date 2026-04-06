@@ -18,7 +18,11 @@ import (
 var baseUrl string
 
 func init() {
-	baseUrl = config.GetCustomization().ApiUrl
+	port := config.GetCustomization().Port
+	if port == "" {
+		port = "8080"
+	}
+	baseUrl = "http://localhost:" + port
 }
 
 func ListSession() []models.Session {

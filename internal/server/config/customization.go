@@ -15,7 +15,7 @@ import (
 // ```
 type Customization struct {
 	SkillsPath   string  `json:"skills_path"`
-	ApiUrl       string  `json:"api_url"`
+	Port         string  `json:"port"`
 	Theme        string  `json:"theme"`
 	Models       []Model `json:"models"`
 	CurrentModel Model   `json:"current_model"`
@@ -33,7 +33,7 @@ func CustomizationPath() (string, error) {
 		bare := Customization{
 			Theme:      "light",
 			SkillsPath: filepath.Join(Dir(), "skills"),
-			ApiUrl:     "http://localhost:8080",
+			Port:       "8080",
 			Models:     []Model{},
 		}
 		d, err := json.Marshal(bare)

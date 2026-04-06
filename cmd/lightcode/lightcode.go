@@ -10,7 +10,7 @@ import (
 )
 
 func Lightcode() {
-	port := config.GetCustomization().ApiUrl
+	port := config.GetCustomization().Port
 	if !isPortInUse(port) {
 		_, err := http.Get("http://localhost:" + port)
 		if err != nil {
@@ -18,10 +18,6 @@ func Lightcode() {
 			go server.Initialise(ready, port)
 			<-ready
 		}
-		// body, err := io.ReadAll(resp.Body)
-		// if string(body) != "lightcode is running!" {
-		// 	log.Fatal("port: " + port + " is not being used by lightcode!")
-		// }
 	}
 	views.LauchHomePage()
 }

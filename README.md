@@ -54,9 +54,9 @@ Example:
 
 Put skills in **`~/.lightcode/skills/`**, each in its own subdirectory containing a **`SKILL.md`** file.
 
-### Server Url
+### Server Port
 
-The HTTP API defaults to port **8080**. To use a different port, Set Api url in  `~/.lightcode/config.json`.
+The HTTP API defaults to port **8080**. To use a different port, Set `port` in  `~/.lightcode/config.json`.
 
 ```bash
 go run ./cmd/lightcode/main.go

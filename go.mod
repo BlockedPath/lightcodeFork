@@ -8,7 +8,6 @@ require (
 	charm.land/glamour/v2 v2.0.0
 	charm.land/lipgloss/v2 v2.0.0
 	github.com/charmbracelet/x/term v0.2.2
-	github.com/joho/godotenv v1.5.1
 	github.com/openai/openai-go/v3 v3.24.0
 	golang.design/x/clipboard v0.7.1
 	gorm.io/driver/sqlite v1.6.0
