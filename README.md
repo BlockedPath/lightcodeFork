@@ -64,6 +64,6 @@ The agent streams responses over Server-Sent Events while tool calls and file op
 
 - [ ] File tracker
 - [ ] Write Install script
-- [ ] Context Compaction
 - [ ] Re write prompts
+- [ ] Check for credentials before making an api call
 

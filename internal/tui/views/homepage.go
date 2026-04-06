@@ -603,11 +603,12 @@ func formatToolCall(tc models.StoredToolCall) string {
 	err := json.Unmarshal([]byte(tc.Arguments), &args)
 	values := ""
 	for _, value := range args {
-		if filepath.IsAbs(value.(string)) {
+		cur := fmt.Sprintf("%v", value)
+		if filepath.IsAbs(cur) {
 			home, _ := os.UserHomeDir()
-			value = strings.Replace(value.(string), home, "~", 1)
+			cur = strings.Replace(cur, home, "~", 1)
 		}
-		values = values + strings.TrimSpace(fmt.Sprintf("%v", value)) + " "
+		values = values + strings.TrimSpace(cur) + " "
 	}
 	if err != nil {
 		return styleToolName.Render(tc.Name) + "()"
@@ -637,20 +638,23 @@ func formatToolResult(content string, codeChanges []string, width int, tc models
 	}
 
 	var sb strings.Builder
-	sb.WriteString("\n")
-	oldlines := strings.Split(codeChanges[1], "\n")
-	if len(oldlines) > 4 {
-		oldlines = oldlines[:4]
-	}
-	newlines := strings.Split(codeChanges[0], "\n")
+	newlines := strings.Split(codeChanges[1], "\n")
+	oldlines := strings.Split(codeChanges[0], "\n")
+	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Green).Render(fmt.Sprintf("+%d", len(newlines))) + " " + lipgloss.NewStyle().Foreground(lipgloss.Red).Render(fmt.Sprintf("-%d", len(oldlines))) + "\n")
+
 	if len(newlines) > 4 {
 		newlines = newlines[:4]
+		newlines = append(newlines, "...")
 	}
-	for _, line := range newlines {
+	if len(oldlines) > 4 {
+		oldlines = oldlines[:4]
+		oldlines = append(oldlines, "...")
+	}
+	for _, line := range oldlines {
 		sb.WriteString(styleRemoved.Width(width).Render("- " + line))
 		sb.WriteString("\n")
 	}
-	for _, line := range oldlines {
+	for _, line := range newlines {
 		sb.WriteString(styleAdded.Width(width).Render("+ " + line))
 		sb.WriteString("\n")
 	}
