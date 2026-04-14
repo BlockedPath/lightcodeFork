@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -82,6 +83,7 @@ type model struct {
 	modelsList        []config.Model
 	isModelsListWin   bool
 	modelsListIndex   int
+	queue             []string
 }
 
 func initialModel() model {
@@ -191,6 +193,9 @@ func (m *model) syncLayout() {
 	if len(m.mode) > 0 {
 		reservedHeight++
 	}
+	if len(m.queue) > 0 {
+		reservedHeight += len(m.queue) + 1
+	}
 	if m.islistCommandsWin {
 		reservedHeight += m.listCommands.Height()
 	}
@@ -293,6 +298,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "esc":
 			if m.streamCh != nil && m.cancelStream != nil && time.Since(m.lastEsc) < 500*time.Millisecond {
+				m.queue = m.queue[:0]
 				m.isGenerating = false
 				m.cancelStream()
 				m.cancelStream = nil
@@ -352,6 +358,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.sessions = append(m.sessions, m.currentSession)
 				client.Reverse(m.sessions)
 				m.listSession.Refresh(m.sessions)
+			}
+			if m.isGenerating == true {
+				m.queue = append(m.queue, createPrompt(strings.Trim(m.textarea.Value(), "\n"), &m))
+				m.textarea.SetValue("")
+				m.syncLayout()
+				return m, nil
 			}
 			m.isGenerating = true
 			m.syncLayout()
@@ -467,6 +479,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}),
 				})
 			}
+			// temp will turn this into a function
+			if len(m.queue) > 0 {
+				m.isGenerating = true
+				m.syncLayout()
+				textareaValue := createPrompt(strings.Trim(m.queue[0], "\n"), &m)
+				m.queue = m.queue[1:]
+				newMessage := client.SendMessage(m.currentSession.ID, textareaValue)
+				m.messages = append(m.messages, newMessage)
+
+				m.viewport.SetContent(renderMessages(m.messages, m.width))
+				ctx, cancel := context.WithCancel(context.Background())
+				ch := client.ChatCompletion(ctx, m.currentSession.ID, textareaValue, m.mode)
+				m.cancelStream = cancel
+				m.streamCh = ch
+				m.textarea.SetValue("")
+				m.textarea.Reset()
+				m.viewport.GotoBottom()
+				return m, tea.Batch(waitForMessages(ch), m.spinner.Tick)
+			}
+
 		}
 		m.viewport.SetContent(renderMessages(m.messages, m.width))
 		m.viewport.GotoBottom()
@@ -498,6 +530,9 @@ func (m model) View() tea.View {
 	}
 	if m.isModelsListWin {
 		sections = append(sections, m.renderModelsList())
+	}
+	if len(m.queue) > 0 {
+		sections = append(sections, m.renderQueueList())
 	}
 
 	textareaSectionIndex := len(sections)
@@ -1038,6 +1073,20 @@ var (
 	styleOptionNormal   = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	styleOptionSelected = lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Bold(true)
 )
+
+func (m model) renderQueueList() string {
+	header := styleTodoTitle.Render("Queue")
+	lines := []string{header}
+	if len(m.queue) == 0 {
+		lines = append(lines, styleOptionNormal.Render(" no models configured"))
+		return strings.Join(lines, "\n")
+	}
+	for i, ent := range m.queue {
+		label := ent
+		lines = append(lines, styleOptionNormal.Render(" "+strconv.Itoa(i+1)+".) "+label))
+	}
+	return strings.Join(lines, "\n")
+}
 
 func (m model) renderModelsList() string {
 	header := styleQuestionHeader.Render("Models")

@@ -92,7 +92,7 @@ go run ./cmd/lightcode/main.go
 - [x] Add a nicer way to use multiple agents like plan, build etc.
 
 - [ ] File tracker
-- [ ] Check for credentials before making an api call
-- [ ] queue
+- [x] Check for credentials before making an api call in .env
+- [x] queue
 
 

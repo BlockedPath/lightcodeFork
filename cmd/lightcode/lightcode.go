@@ -1,4 +1,4 @@
-package lightcode
+package main
 
 import (
 	"net"
@@ -9,7 +9,7 @@ import (
 	"github.com/Kartik-2239/lightcode/internal/tui/views"
 )
 
-func Lightcode() {
+func main() {
 	port := config.GetCustomization().Port
 	if !isPortInUse(port) {
 		_, err := http.Get("http://localhost:" + port)
