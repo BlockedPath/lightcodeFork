@@ -77,6 +77,7 @@ type model struct {
 	questionAnswers   []string
 	questionSelected  int
 	todoList          []models.ToDo
+	modes             []string
 	mode              string
 	modelsList        []config.Model
 	isModelsListWin   bool
@@ -166,6 +167,7 @@ func initialModel() model {
 		isGenerating:      false,
 		lastEsc:           time.Now(),
 		mode:              "chat",
+		modes:             []string{"chat", "plan", "assistant"},
 		modelsList:        modelsList,
 		isModelsListWin:   false,
 		modelsListIndex:   currentModelIndex,
@@ -186,7 +188,7 @@ func (m *model) syncLayout() {
 	if m.isGenerating {
 		reservedHeight++
 	}
-	if m.mode == "chat" || m.mode == "plan" {
+	if len(m.mode) > 0 {
 		reservedHeight++
 	}
 	if m.islistCommandsWin {
@@ -372,11 +374,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport, cmd = m.viewport.Update(msg)
 			return m, cmd
 		case "tab":
-			if m.mode != "plan" {
-				m.mode = "plan"
-			} else {
-				m.mode = "chat"
+			for i, v := range m.modes {
+				if v == m.mode {
+					m.mode = m.modes[(i+1)%len(m.modes)]
+					break
+				}
 			}
+			return m, nil
 
 		case "/":
 			var cmd tea.Cmd
@@ -487,9 +491,6 @@ func (m model) View() tea.View {
 		renderMessages(m.messages, m.width))
 
 	sections := make([]string, 0, 5)
-	if m.bashMode {
-		sections = append(sections, "Bash Mode")
-	}
 	sections = append(sections, m.viewport.View())
 
 	if m.questionMode {
@@ -502,11 +503,8 @@ func (m model) View() tea.View {
 	textareaSectionIndex := len(sections)
 	sections = append(sections, m.textarea.View())
 	if !m.islistCommandsWin {
-		if m.mode == "plan" {
-			sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.BrightMagenta).Bold(true).Render("Plan")+" "+lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Bold(false).Render(m.modelsList[m.modelsListIndex].Model))
-		} else {
-			sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.BrightBlue).Bold(true).Render("Chat")+" "+lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Bold(false).Render(m.modelsList[m.modelsListIndex].Model))
-		}
+		s := strings.ToUpper(m.mode[:1]) + m.mode[1:]
+		sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.BrightMagenta).Bold(true).Render(s)+" "+lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Bold(false).Render(m.modelsList[m.modelsListIndex].Model))
 	}
 
 	if m.isGenerating {

@@ -20,7 +20,6 @@ Guidelines:
 - Do not create any files, or run bash commands that modify the user's system state in any way
 
 Complete the user's search request efficiently and report your findings clearly.
-
 	`
 }
 

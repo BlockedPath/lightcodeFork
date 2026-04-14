@@ -89,9 +89,10 @@ go run ./cmd/lightcode/main.go
 - [x] todo tool - handle in the ui and send it as context in agent.go 
 - [x] json data for model selection etc
 - [x] need to also integrate anthropic go sdk cause response format for tool calling in models like glp and claude (fixed without adding anthropic api)
-
+- [x] Add a nicer way to use multiple agents like plan, build etc.
 
 - [ ] File tracker
-- [ ] Re write prompts
 - [ ] Check for credentials before making an api call
+- [ ] queue
+
 

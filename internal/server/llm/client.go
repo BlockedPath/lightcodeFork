@@ -35,9 +35,13 @@ func ApiCall(ctx context.Context, input string, chats []Chat, mode string) Respo
 
 	var messages []openai.ChatCompletionMessageParamUnion
 	if mode == "plan" {
-		messages = append(messages, openai.SystemMessage(prompt.Plan_prompt()))
-	} else {
+		messages = append(messages, openai.SystemMessage(prompt.Plan_prompt()+prompt.AvailableSkills()))
+	}
+	if mode == "chat" {
 		messages = append(messages, openai.SystemMessage(prompt.SystemPrompt()+" Available skills: "+" "+prompt.AvailableSkills()))
+	}
+	if mode == "assistant" {
+		messages = append(messages, openai.SystemMessage(prompt.Assistant_prompt()+prompt.ExplorePrompt()))
 	}
 
 	for _, c := range chats {
