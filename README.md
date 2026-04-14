@@ -17,35 +17,25 @@ Settings live under **`~/.lightcode/`**. The app creates this directory and a de
 
 Providers must speak the **OpenAI Chat Completions** API. Add entries to the `models` array in `~/.lightcode/config.json`. Each entry is an object with:
 
-| Field | Meaning |
-|--------|---------|
-| `model` | Model id as your provider expects it (e.g. `gpt-4o`) |
-| `base_url` | Base URL for the API (OpenAI-compatible) |
-| `api_key` | Secret for that provider |
-
 Example:
 
 ```json
 {
   "theme": "light",
-  "models": [
+  "skills_path": "choose_any_skill_path"
+  "port: "8000"
+  "providers": [
     {
-      "model": "another-model-id",
+      "models": ["another-model-id"],
       "base_url": "https://your-gateway.example/v1",
       "api_key": "..."
     },
     {
-      "model": "another-model-id-2",
+      "models": ["another-model-id-2]",
       "base_url": "https://your-gateway.example/v1",
       "api_key": "..."
     }
-  ],
-  "current_model": {
-      "model": "another-model-id",
-      "base_url": "https://your-gateway.example/v1",
-      "api_key": "..."
-    }
-}
+  ]
 ```
 
 - In the TUI, run **`/models`** to select one of the models

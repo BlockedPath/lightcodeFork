@@ -14,17 +14,27 @@ import (
 // API_URL=http://localhost:8080
 // ```
 type Customization struct {
-	SkillsPath   string  `json:"skills_path"`
-	Port         string  `json:"port"`
-	Theme        string  `json:"theme"`
-	Models       []Model `json:"models"`
-	CurrentModel Model   `json:"current_model"`
+	SkillsPath   string     `json:"skills_path"`
+	Port         string     `json:"port"`
+	Theme        string     `json:"theme"`
+	Providers    []Provider `json:"providers"`
+	CurrentModel ResModel   `json:"current_model"`
 }
 
-type Model struct {
+type Provider struct {
+	BaseUrl string   `json:"base_url"`
+	ApiKey  string   `json:"api_key"`
+	Models  []string `json:"models"`
+}
+
+// type Model struct {
+// 	Model string `json:"model"`
+// }
+
+type ResModel struct {
 	Model   string `json:"model"`
-	BaseUrl string `json:"base_url"`
 	ApiKey  string `json:"api_key"`
+	BaseUrl string `json:"base_url"`
 }
 
 func CustomizationPath() (string, error) {
@@ -34,7 +44,7 @@ func CustomizationPath() (string, error) {
 			Theme:      "light",
 			SkillsPath: filepath.Join(Dir(), "skills"),
 			Port:       "8080",
-			Models:     []Model{},
+			Providers:  []Provider{},
 		}
 		d, err := json.Marshal(bare)
 		if err != nil {
@@ -81,33 +91,40 @@ func SetTheme(theme string) error {
 	return nil
 }
 
-func GetModels() ([]Model, error) {
-	models := GetCustomization().Models
-	if len(models) == 0 {
-		return []Model{}, errors.New("no models found")
+func GetModels() ([]ResModel, error) {
+	providers := GetCustomization().Providers
+	models := []ResModel{}
+	for _, provider := range providers {
+		for _, model := range provider.Models {
+			models = append(models, ResModel{
+				ApiKey:  provider.ApiKey,
+				BaseUrl: provider.BaseUrl,
+				Model:   model,
+			})
+		}
 	}
 	return models, nil
 }
 
-func AddModel(model Model) error {
-	path, err := CustomizationPath()
-	if err != nil {
-		return errors.New("Error Adding model")
-	}
-	customization := GetCustomization()
-	customization.Models = append(customization.Models, model)
-	d, err := json.Marshal(customization)
-	if err != nil {
-		return errors.New("Error Adding model")
-	}
-	err = os.WriteFile(path, d, 0644)
-	if err != nil {
-		return errors.New("Error Adding model")
-	}
-	return nil
-}
+// func AddModel(model Model) error {
+// 	path, err := CustomizationPath()
+// 	if err != nil {
+// 		return errors.New("Error Adding model")
+// 	}
+// 	customization := GetCustomization()
+// 	customization.Models = append(customization.Models, model)
+// 	d, err := json.Marshal(customization)
+// 	if err != nil {
+// 		return errors.New("Error Adding model")
+// 	}
+// 	err = os.WriteFile(path, d, 0644)
+// 	if err != nil {
+// 		return errors.New("Error Adding model")
+// 	}
+// 	return nil
+// }
 
-func SetCurrentModel(model Model) error {
+func SetCurrentModel(model ResModel) error {
 	customization := GetCustomization()
 	customization.CurrentModel = model
 	d, err := json.Marshal(customization)
@@ -125,9 +142,13 @@ func SetCurrentModel(model Model) error {
 	return nil
 }
 
-func GetCurrentModel() Model {
+func GetCurrentModel() ResModel {
 	if GetCustomization().CurrentModel.Model == "" {
-		return GetCustomization().Models[0]
+		models, err := GetModels()
+		if err != nil {
+			return ResModel{}
+		}
+		return models[0]
 	}
 	return GetCustomization().CurrentModel
 }

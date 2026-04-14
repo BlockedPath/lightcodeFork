@@ -80,7 +80,7 @@ type model struct {
 	todoList          []models.ToDo
 	modes             []string
 	mode              string
-	modelsList        []config.Model
+	modelsList        []config.ResModel
 	isModelsListWin   bool
 	modelsListIndex   int
 	queue             []string
@@ -136,7 +136,7 @@ func initialModel() model {
 
 	modelsList, err := config.GetModels()
 	if err != nil {
-		modelsList = []config.Model{}
+		modelsList = []config.ResModel{}
 	}
 
 	currentModel := config.GetCurrentModel()
@@ -991,7 +991,7 @@ func CmdHandler(cmd string, m *model) tea.Cmd {
 		m.textarea.Reset()
 		list, err := config.GetModels()
 		if err != nil {
-			list = []config.Model{}
+			list = []config.ResModel{}
 		}
 		m.modelsList = list
 		m.modelsListIndex = 0
