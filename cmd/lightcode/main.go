@@ -1,4 +1,4 @@
-package lightcode
+package main
 
 import (
 	"net"
@@ -8,6 +8,10 @@ import (
 	"github.com/Kartik-2239/lightcode/internal/server/config"
 	"github.com/Kartik-2239/lightcode/internal/tui/views"
 )
+
+func main() {
+	Lightcode()
+}
 
 func Lightcode() {
 	port := config.GetCustomization().Port
