@@ -1,4 +1,4 @@
-package lightcode
+package main
 
 import (
 	"net"
