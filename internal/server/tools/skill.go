@@ -45,9 +45,13 @@ func Skill(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 }
 
 func init() {
+	Prompt := `Load a skill from the available skills using skill name
+	
+- Skills are lazy loaded prompts and definition of how to use/implement something.
+- use this tool to load skills when required`
 	Register("skill", ToolDef{
 		Name:        "skill",
-		Description: "Load a skill from the available skills using skill name",
+		Description: Prompt,
 		Params: map[string]any{
 			"type": "object",
 			"properties": map[string]any{

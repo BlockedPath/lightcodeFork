@@ -12,9 +12,13 @@ type QuestionItem struct {
 }
 
 func init() {
+	Prompt := `Ask one or more questions to the user
+Rules to follow :-
+- Use this tool for asking questions to the user about implementation of ideas when the prompt given by the user isn't enough
+- Use this tool to get more information about how the project should be like, or what decisions to take.`
 	Register("question", ToolDef{
 		Name:        "question",
-		Description: "Ask one or more questions to the user",
+		Description: Prompt,
 		Params: map[string]any{
 			"type": "object",
 			"properties": map[string]any{

@@ -76,9 +76,10 @@ func ReadFile(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 }
 
 func init() {
+	Prompt := `Read tool for getting the content from a particular file`
 	Register("read_file", ToolDef{
 		Name:        "read_file",
-		Description: "RETURNS THE CONTENTS OF A FILE FROM THE FILESYSTEM, don't keep calling it again and again like a fucking idiot",
+		Description: Prompt,
 		Params: map[string]any{
 			"type": "object",
 			"properties": map[string]any{

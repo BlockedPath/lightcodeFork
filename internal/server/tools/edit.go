@@ -64,9 +64,13 @@ func Edit(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 }
 
 func init() {
+	Prompt := `Perform exact string replacements in existing files
+- Read the file before using edit tool and provide the exact old string and filepath
+- DO NOT GUESS THE OLD STRING AND FILE PATH
+`
 	Register("edit", ToolDef{
 		Name:        "edit",
-		Description: "Perform exact string replacements in existing files",
+		Description: Prompt,
 		Params: map[string]any{
 			"type": "object",
 			"properties": map[string]any{

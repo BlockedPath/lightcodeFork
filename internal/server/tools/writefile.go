@@ -38,9 +38,10 @@ func WriteFile(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 }
 
 func init() {
+	Prompt := `"Write content to a file, creating it if it doesn't exist", Do not guess paths before writing a new file`
 	Register("write_file", ToolDef{
 		Name:        "write_file",
-		Description: "Write content to a file, creating it if it doesn't exist",
+		Description: Prompt,
 		Params: map[string]any{
 			"type": "object",
 			"properties": map[string]any{

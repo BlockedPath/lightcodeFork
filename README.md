@@ -84,5 +84,4 @@ go run ./cmd/lightcode/main.go
 - [ ] File tracker
 - [x] Check for credentials before making an api call in .env
 - [x] queue
-
-
+- [ ] handle errors
