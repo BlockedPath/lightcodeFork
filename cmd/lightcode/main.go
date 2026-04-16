@@ -11,8 +11,16 @@ import (
 
 func main() {
 	Lightcode()
-}
 
+}
+func isPortInUse(port string) bool {
+	ln, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		return true // port is in use
+	}
+	ln.Close()
+	return false
+}
 func Lightcode() {
 	port := config.GetCustomization().Port
 	if !isPortInUse(port) {
@@ -24,13 +32,4 @@ func Lightcode() {
 		}
 	}
 	views.LauchHomePage()
-}
-
-func isPortInUse(port string) bool {
-	ln, err := net.Listen("tcp", ":"+port)
-	if err != nil {
-		return true // port is in use
-	}
-	ln.Close()
-	return false
 }
