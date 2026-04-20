@@ -135,6 +135,10 @@ func initialModel() model {
 	spin.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	modelsList, err := config.GetModels()
+	if len(modelsList) == 0 {
+		fmt.Println("No models found, add models in ~/.lightcode/config.json")
+		os.Exit(1)
+	}
 	if err != nil {
 		modelsList = []config.ResModel{}
 	}
@@ -432,6 +436,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case streamMessageMsg:
+		if msg.Role == "error" {
+			return m, nil
+		}
 		m.messages = append(m.messages, models.Message{
 			SessionID: m.currentSession.ID,
 			// ID:        fmt.Sprintf("%s-assistant-%d", m.currentSession.ID, len(m.messages)),
@@ -919,6 +926,9 @@ func renderMessages(msgs []models.Message, width int) string {
 func waitForMessages(ch chan models.StoredMessageData) tea.Cmd {
 	return func() tea.Msg {
 		msg, ok := <-ch
+		if msg.Role == "error" {
+			return streamDoneMsg{}
+		}
 		if !ok {
 			return streamDoneMsg{}
 		}

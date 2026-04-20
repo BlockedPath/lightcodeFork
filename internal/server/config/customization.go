@@ -46,7 +46,7 @@ func CustomizationPath() (string, error) {
 			Port:       "8080",
 			Providers:  []Provider{},
 		}
-		d, err := json.Marshal(bare)
+		d, err := json.MarshalIndent(bare, "", " ")
 		if err != nil {
 			return "", err
 		}
@@ -76,7 +76,7 @@ func GetTheme() string {
 func SetTheme(theme string) error {
 	customization := GetCustomization()
 	customization.Theme = theme
-	d, err := json.Marshal(customization)
+	d, err := json.MarshalIndent(customization, "", " ")
 	if err != nil {
 		return errors.New("Error Setting theme")
 	}
@@ -127,7 +127,7 @@ func GetModels() ([]ResModel, error) {
 func SetCurrentModel(model ResModel) error {
 	customization := GetCustomization()
 	customization.CurrentModel = model
-	d, err := json.Marshal(customization)
+	d, err := json.MarshalIndent(customization, "", " ")
 	if err != nil {
 		return errors.New("Error Setting current model")
 	}

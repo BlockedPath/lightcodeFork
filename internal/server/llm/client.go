@@ -29,7 +29,7 @@ type Chat struct {
 	ToolCallID string
 }
 
-func ApiCall(ctx context.Context, input string, chats []Chat, mode string) Response {
+func ApiCall(ctx context.Context, input string, chats []Chat, mode string) (Response, error) {
 	var toolCalls []ToolCall
 	client := openai.NewClient(option.WithAPIKey(config.GetCurrentModel().ApiKey), option.WithBaseURL(config.GetCurrentModel().BaseUrl))
 
@@ -58,18 +58,20 @@ func ApiCall(ctx context.Context, input string, chats []Chat, mode string) Respo
 		messages = append(messages, openai.UserMessage(input))
 	}
 	m := config.GetCurrentModel().Model
+
+	// if mode == "plan" {
+	// 	resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+	// 		Messages: messages,
+	// 		Tools:    tools.GetToolsForPlan(),
+	// 		Model:    m,
+	// 	})
+	// }else{
 	resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Messages: messages,
 		Tools:    tools.GetToolsForChat(),
 		Model:    m,
 	})
-	if mode == "plan" {
-		resp, err = client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-			Messages: messages,
-			Tools:    tools.GetToolsForPlan(),
-			Model:    m,
-		})
-	}
+	// }
 
 	if err != nil {
 		fmt.Println("Error", err)
@@ -77,14 +79,14 @@ func ApiCall(ctx context.Context, input string, chats []Chat, mode string) Respo
 			Text:             "Ran into an error while calling the LLM",
 			ToolCalls:        []ToolCall{},
 			CompleteResponse: nil,
-		}
+		}, err
 	}
 	if len(resp.Choices) == 0 {
 		return Response{
 			Text:             "Ran into an error while calling the LLM",
 			ToolCalls:        []ToolCall{},
 			CompleteResponse: nil,
-		}
+		}, err
 	}
 
 	for _, item := range resp.Choices[0].Message.ToolCalls {
@@ -99,7 +101,7 @@ func ApiCall(ctx context.Context, input string, chats []Chat, mode string) Respo
 		Text:             resp.Choices[0].Message.Content,
 		ToolCalls:        toolCalls,
 		CompleteResponse: resp,
-	}
+	}, nil
 }
 
 func ExecuteToolCall(tc ToolCall, workingDirectory string, sessionID string) (tools.ToolResponse, error) {

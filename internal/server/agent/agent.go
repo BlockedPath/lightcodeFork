@@ -93,7 +93,12 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode 
 			database.Where("id = ?", session_id).First(&session)
 			cur_list := session.ToDoList
 			chats = append(chats, llm.Chat{Role: "user", Content: cur_list})
-			resp := llm.ApiCall(ctx, "", chats, mode)
+			resp, err := llm.ApiCall(ctx, "", chats, mode)
+			if err != nil {
+				errorMessage := models.StoredMessageData{Role: "error", Content: resp.Text, Usage: &models.StoredUsage{}}
+				ch <- errorMessage
+				return
+			}
 			select {
 			case <-ctx.Done():
 				return
