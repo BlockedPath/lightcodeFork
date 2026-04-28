@@ -31,7 +31,8 @@ type Chat struct {
 
 func ApiCall(ctx context.Context, input string, chats []Chat, mode string) (Response, error) {
 	var toolCalls []ToolCall
-	client := openai.NewClient(option.WithAPIKey(config.GetCurrentModel().ApiKey), option.WithBaseURL(config.GetCurrentModel().BaseUrl))
+	cur_model := config.GetCustomization().CurrentModel
+	client := openai.NewClient(option.WithAPIKey(cur_model.ApiKey), option.WithBaseURL(cur_model.BaseUrl))
 
 	var messages []openai.ChatCompletionMessageParamUnion
 	if mode == "plan" {
@@ -57,7 +58,15 @@ func ApiCall(ctx context.Context, input string, chats []Chat, mode string) (Resp
 	if input != "" {
 		messages = append(messages, openai.UserMessage(input))
 	}
-	m := config.GetCurrentModel().Model
+	cur_model, err := config.GetCurrentModel()
+	if err != nil {
+		return Response{
+			Text:             "Ran into an error while getting the model",
+			ToolCalls:        []ToolCall{},
+			CompleteResponse: nil,
+		}, err
+	}
+	m := cur_model.Model
 
 	// if mode == "plan" {
 	// 	resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{

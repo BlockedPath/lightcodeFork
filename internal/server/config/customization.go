@@ -142,13 +142,13 @@ func SetCurrentModel(model ResModel) error {
 	return nil
 }
 
-func GetCurrentModel() ResModel {
+func GetCurrentModel() (ResModel, error) {
 	if GetCustomization().CurrentModel.Model == "" {
 		models, err := GetModels()
 		if err != nil {
-			return ResModel{}
+			return ResModel{}, err
 		}
-		return models[0]
+		return models[0], nil
 	}
-	return GetCustomization().CurrentModel
+	return GetCustomization().CurrentModel, nil
 }

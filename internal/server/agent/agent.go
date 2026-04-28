@@ -13,7 +13,7 @@ import (
 )
 
 const MaxIterations = 25
-const DEBUG = false
+const DEBUG = true
 
 type Agent struct{}
 

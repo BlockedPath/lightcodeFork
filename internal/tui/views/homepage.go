@@ -128,12 +128,14 @@ func initialModel() model {
 		modelsList = []config.ResModel{}
 	}
 
-	currentModel := config.GetCurrentModel()
+	currentModel, err := config.GetCurrentModel()
 	currentModelIndex := 0
-	for i, model := range modelsList {
-		if model.Model == currentModel.Model {
-			currentModelIndex = i
-			break
+	if err == nil {
+		for i, model := range modelsList {
+			if model.Model == currentModel.Model {
+				currentModelIndex = i
+				break
+			}
 		}
 	}
 

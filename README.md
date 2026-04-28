@@ -78,7 +78,8 @@ go run ./cmd/lightcode/main.go
 - [x] Plan mode - prompt and tool filter
 - [x] todo tool - handle in the ui and send it as context in agent.go 
 - [x] json data for model selection etc
-- [x] need to also integrate anthropic go sdk cause response format for tool calling in models like glp and claude (fixed without adding anthropic api)
+- [x] need to also integrate anthropic go sdk cause response format for tool calling in models like
+ glm and claude (fixed without adding anthropic api)
 - [x] Add a nicer way to use multiple agents like plan, build etc.
 
 - [x] Check for credentials before making an api call in .env
@@ -87,9 +88,10 @@ go run ./cmd/lightcode/main.go
 
 - [x] break the ui into more manageable parts
 - [x] handle space under dot
-- [x] Agents.md
+- [x] AGENTS.md
 - [x] /usage command
 - [x] add flags like -p for prompting and -id and all for session id and run the cli that way
+
 - [ ] add model selections, from the ui, like add models with api keys
 - [ ] File tracker
 
