@@ -85,3 +85,9 @@ go run ./cmd/lightcode/main.go
 - [x] Check for credentials before making an api call in .env
 - [x] queue
 - [ ] handle errors
+
+- [ ] break the ui into more manageable parts
+- [ ] follow a theme of ui
+- [ ] add model selections, from the ui, like add models with api keys
+- [x] Agents.md
+- [ ] /usage command

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/Kartik-2239/lightcode/internal/server/db"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
@@ -57,7 +58,7 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode 
 			}
 			var messages []models.Message
 			database.Where("session_id = ?", session_id).Find(&messages)
-			chats := make([]llm.Chat, 0, len(messages))
+			chats := make([]llm.Chat, 0, len(messages)+2) // +2 for agents.md and todo list
 			for _, message := range messages {
 				d := models.DecodeMessageData(message.Data)
 				switch d.Role {
@@ -74,17 +75,6 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode 
 				case "assistant":
 					content := d.Content
 					chats = append(chats, llm.Chat{Role: "assistant", Content: content})
-					// if content == "" && len(d.ToolCalls) > 0 {
-					// 	names := make([]string, len(d.ToolCalls))
-					// 	for j, tc := range d.ToolCalls {
-					// 		names[j] = tc.Name + " (call_id=" + tc.ID + ")"
-					// 	}
-					// 	content = "(Called tools: " + strings.Join(names, ", ") + ")"
-					// } else {
-
-					// 	chats = append(chats, llm.Chat{Role: "assistant", Content: content})
-					// }
-
 				default:
 					chats = append(chats, llm.Chat{Role: d.Role, Content: d.Content})
 				}
@@ -93,6 +83,11 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode 
 			database.Where("id = ?", session_id).First(&session)
 			cur_list := session.ToDoList
 			chats = append(chats, llm.Chat{Role: "user", Content: cur_list})
+
+			slices.Reverse(chats)
+			chats = append(chats, llm.Chat{Role: "user", Content: fmt.Sprintf("<agents_md>%s<agents_md>", ReadAgentsMd(session.Directory))})
+			slices.Reverse(chats)
+
 			resp, err := llm.ApiCall(ctx, "", chats, mode)
 			if err != nil {
 				errorMessage := models.StoredMessageData{Role: "error", Content: resp.Text, Usage: &models.StoredUsage{}}

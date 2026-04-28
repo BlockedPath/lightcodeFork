@@ -6,3 +6,4 @@ lightcode.db
 .cursorignore
 makefile
 .DS_Store
+main

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"net"
 	"net/http"
 
@@ -10,7 +11,10 @@ import (
 )
 
 func main() {
-	Lightcode()
+	isServer := flag.Bool("server", false, "to run the server only")
+	isTui := flag.Bool("tui", false, "to run the tui only")
+	flag.Parse()
+	Lightcode(!*isTui, !*isServer)
 
 }
 func isPortInUse(port string) bool {
@@ -21,15 +25,19 @@ func isPortInUse(port string) bool {
 	ln.Close()
 	return false
 }
-func Lightcode() {
+func Lightcode(isServer bool, isTui bool) {
 	port := config.GetCustomization().Port
 	if !isPortInUse(port) {
 		_, err := http.Get("http://localhost:" + port)
 		if err != nil {
-			ready := make(chan struct{})
-			go server.Initialise(ready, port)
-			<-ready
+			if isServer {
+				ready := make(chan struct{})
+				go server.Initialise(ready, port)
+				<-ready
+			}
 		}
 	}
-	views.LauchHomePage()
+	if isTui {
+		views.LauchHomePage()
+	}
 }
