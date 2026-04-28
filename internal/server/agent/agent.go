@@ -83,10 +83,12 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode 
 			database.Where("id = ?", session_id).First(&session)
 			cur_list := session.ToDoList
 			chats = append(chats, llm.Chat{Role: "user", Content: cur_list})
-
-			slices.Reverse(chats)
-			chats = append(chats, llm.Chat{Role: "user", Content: fmt.Sprintf("<agents_md>%s<agents_md>", ReadAgentsMd(session.Directory))})
-			slices.Reverse(chats)
+			agents_md, err := ReadAgentsMd(session.Directory)
+			if err != nil {
+				slices.Reverse(chats)
+				chats = append(chats, llm.Chat{Role: "user", Content: fmt.Sprintf("<agents_md>%s<agents_md>", agents_md)})
+				slices.Reverse(chats)
+			}
 
 			resp, err := llm.ApiCall(ctx, "", chats, mode)
 			if err != nil {

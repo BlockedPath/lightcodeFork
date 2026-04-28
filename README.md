@@ -81,16 +81,15 @@ go run ./cmd/lightcode/main.go
 - [x] need to also integrate anthropic go sdk cause response format for tool calling in models like glp and claude (fixed without adding anthropic api)
 - [x] Add a nicer way to use multiple agents like plan, build etc.
 
-- [ ] File tracker
 - [x] Check for credentials before making an api call in .env
 - [x] queue
-- [ ] handle errors
+- [x] handle basic errors
 
-- [ ] break the ui into more manageable parts
-- [ ] follow a theme of ui
-- [ ] add model selections, from the ui, like add models with api keys
+- [x] break the ui into more manageable parts
 - [x] handle space under dot
 - [x] Agents.md
 - [x] /usage command
-- [ ] context compaction
+- [x] add flags like -p for prompting and -id and all for session id and run the cli that way
+- [ ] add model selections, from the ui, like add models with api keys
+- [ ] File tracker
 

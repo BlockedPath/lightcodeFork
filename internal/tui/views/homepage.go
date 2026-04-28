@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"html"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -18,7 +16,6 @@ import (
 	"charm.land/bubbles/v2/textarea"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/glamour/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/Kartik-2239/lightcode/internal/server/config"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
@@ -34,9 +31,6 @@ func LauchHomePage() {
 		fmt.Fprintf(os.Stderr, "Oof: %v\n", err)
 	}
 }
-
-type streamMessageMsg models.StoredMessageData
-type streamDoneMsg struct{}
 
 type questionItem struct {
 	question string
@@ -90,12 +84,6 @@ func initialModel() model {
 	ta.Focus()
 
 	ta.Prompt = "┃ "
-	// ta.SetPromptFunc(2, func(info textarea.PromptInfo) string {
-	// 	if info.LineNumber == 0 {
-	// 		return "❯ "
-	// 	}
-	// 	return " "
-	// })
 
 	ta.CharLimit = 32000
 
@@ -299,22 +287,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "esc":
 			if m.streamCh != nil && m.cancelStream != nil && time.Since(m.lastEsc) < 500*time.Millisecond {
-				m.queue = m.queue[:0]
-				m.isGenerating = false
-				m.cancelStream()
-				m.cancelStream = nil
-				m.streamCh = nil
-				m.syncLayout()
-				m.messages = append(m.messages, models.Message{
-					SessionID: m.currentSession.ID,
-					Data: models.EncodeMessageData(models.StoredMessageData{
-						Role: "assistant", Content: "*Generation stopped.*",
-					}),
-				})
-				m.viewport.SetContent(renderMessages(m.messages, m.width))
-				m.viewport.GotoBottom()
-				m.syncLayout()
-				m.showEscMsg = false
+				m.cancelActiveGeneration()
 				return m, nil
 			}
 			m.lastEsc = time.Now()
@@ -352,36 +325,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmd := CmdHandler(m.textarea.Value(), &m)
 				return m, cmd
 			}
-			if m.currentSession.ID == "" {
-				session_id := client.CreateSession((m.textarea.Value()))
-				m.currentSession = models.Session{ID: session_id, Title: m.textarea.Value(), Directory: "."}
-				client.Reverse(m.sessions)
-				m.sessions = append(m.sessions, m.currentSession)
-				client.Reverse(m.sessions)
-				m.listSession.Refresh(m.sessions)
-			}
+			m.ensureCurrentSession(m.textarea.Value())
 			if m.isGenerating == true {
 				m.queue = append(m.queue, createPrompt(strings.Trim(m.textarea.Value(), "\n"), &m))
 				m.textarea.SetValue("")
 				m.syncLayout()
 				return m, nil
 			}
-			m.isGenerating = true
-			m.syncLayout()
-			textareaValue := createPrompt(strings.Trim(m.textarea.Value(), "\n"), &m)
-
-			newMessage := client.SendMessage(m.currentSession.ID, textareaValue)
-			m.messages = append(m.messages, newMessage)
-
-			m.viewport.SetContent(renderMessages(m.messages, m.width))
-			ctx, cancel := context.WithCancel(context.Background())
-			ch := client.ChatCompletion(ctx, m.currentSession.ID, textareaValue, m.mode)
-			m.cancelStream = cancel
-			m.streamCh = ch
-			m.textarea.SetValue("")
-			m.textarea.Reset()
-			m.viewport.GotoBottom()
-			return m, tea.Batch(waitForMessages(ch), m.spinner.Tick)
+			return m, m.beginGeneration(m.textarea.Value())
 		case "up", "down":
 			var cmd tea.Cmd
 			m.viewport, cmd = m.viewport.Update(msg)
@@ -442,9 +393,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			Data: models.EncodeMessageData(models.StoredMessageData(msg)),
 		})
 
-		m.viewport.SetContent(renderMessages(m.messages, m.width))
+		m.refreshMessagesView()
 		m.syncLayout()
-		m.viewport.GotoBottom()
 		if msg.Role == "question" {
 			questions := parseQuestions(msg.Content)
 			if len(questions) > 0 {
@@ -485,27 +435,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			// temp will turn this into a function
 			if len(m.queue) > 0 {
-				m.isGenerating = true
-				m.syncLayout()
-				textareaValue := createPrompt(strings.Trim(m.queue[0], "\n"), &m)
-				m.queue = m.queue[1:]
-				newMessage := client.SendMessage(m.currentSession.ID, textareaValue)
-				m.messages = append(m.messages, newMessage)
-
-				m.viewport.SetContent(renderMessages(m.messages, m.width))
-				ctx, cancel := context.WithCancel(context.Background())
-				ch := client.ChatCompletion(ctx, m.currentSession.ID, textareaValue, m.mode)
-				m.cancelStream = cancel
-				m.streamCh = ch
-				m.textarea.SetValue("")
-				m.textarea.Reset()
-				m.viewport.GotoBottom()
-				return m, tea.Batch(waitForMessages(ch), m.spinner.Tick)
+				return m, m.runNextQueuedPrompt()
 			}
 
 		}
-		m.viewport.SetContent(renderMessages(m.messages, m.width))
-		m.viewport.GotoBottom()
+		m.refreshMessagesView()
 		m.syncLayout()
 		return m, nil
 
@@ -572,389 +506,6 @@ func (m model) View() tea.View {
 	return v
 }
 
-var (
-	styleDot        = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true)
-	styleToolName   = lipgloss.NewStyle().Bold(true)
-	styleTree       = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
-	styleUser       = lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Bold(true).Background(lipgloss.Color("236")).Padding(0, 1)
-	styleThink      = lipgloss.NewStyle().Foreground(lipgloss.BrightBlack).Bold(false)
-	styleResultText = lipgloss.NewStyle().Foreground(lipgloss.Color("7"))
-	styleAdded      = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#aff5b4")).
-			Background(lipgloss.Color("#1a3a2a")).
-			PaddingLeft(1)
-	styleRemoved = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#ffdcd7")).
-			Background(lipgloss.Color("#3d1a1f")).
-			PaddingLeft(1)
-	styleTodoTitle = lipgloss.NewStyle().Foreground(lipgloss.Color("86")).Bold(true)
-	styleTodoEmpty = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true)
-	styleTodoDone  = lipgloss.NewStyle().Foreground(lipgloss.Color("247")).Strikethrough(true)
-	styleTodoOpen  = lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
-	styleTodoBox   = lipgloss.NewStyle().
-			Padding(0, 1).
-			MarginLeft(2)
-)
-
-func withoutEphemeralTodoStatus(msgs []models.Message) []models.Message {
-	var out []models.Message
-	for _, msg := range msgs {
-		if models.DecodeMessageData(msg.Data).Role == "todo_status" {
-			continue
-		}
-		out = append(out, msg)
-	}
-	return out
-}
-
-func renderTodoStatusBlock(dot string, todos []models.ToDo, width int) string {
-	title := styleTodoTitle.Render("Todo list")
-	boxStyle := styleTodoBox
-	if width > 8 {
-		boxStyle = boxStyle.MaxWidth(width - 4)
-	}
-	var inner strings.Builder
-	if len(todos) == 0 {
-		inner.WriteString(styleTodoEmpty.Render("No tasks in this session."))
-	} else {
-		for _, t := range todos {
-			// prefix := "├ "
-			// if i == len(todos)-1 {
-			// 	prefix = "└ "
-			// }
-			mark := lipgloss.NewStyle().Foreground(lipgloss.Color("86")).Render("[ ] ")
-			line := styleTodoOpen.Render(t.Description)
-			if t.Completed {
-				mark = lipgloss.NewStyle().Foreground(lipgloss.Color("247")).Render("[x] ")
-				line = styleTodoDone.Render(t.Description)
-			}
-			inner.WriteString(mark + line + "\n")
-		}
-	}
-	boxed := boxStyle.Render(strings.TrimSuffix(inner.String(), "\n"))
-	return dot + " " + title + "\n" + boxed
-}
-
-func formatToolCall(tc models.StoredToolCall) string {
-	var args map[string]interface{}
-	err := json.Unmarshal([]byte(tc.Arguments), &args)
-	values := ""
-	for _, value := range args {
-		cur := fmt.Sprintf("%v", value)
-		if filepath.IsAbs(cur) {
-			home, _ := os.UserHomeDir()
-			cur = strings.Replace(cur, home, "~", 1)
-		}
-		values = values + strings.TrimSpace(cur) + " "
-	}
-	if err != nil {
-		return styleToolName.Render(tc.Name) + "()"
-	}
-	if tc.Name == "write_file" || tc.Name == "edit" || tc.Name == "skill" {
-		return styleToolName.Render(tc.Name)
-	}
-	return styleToolName.Render(tc.Name) + "(" + styleTree.Render(values) + ")"
-}
-
-func formatToolResult(content string, codeChanges []string, width int, tc models.StoredToolCall) string {
-	content = strings.TrimSpace(content)
-	if content == "" {
-		return styleResultText.Render("(no output)")
-	}
-	if strings.Contains(tc.Name, "todo") {
-		return renderTodoStatusBlock(styleDot.Render("●"), models.DecodeToDoList(content), width)
-	}
-	if len(codeChanges) == 0 {
-		lines := strings.Split(content, "\n")
-		if len(lines) <= 4 {
-			home, _ := os.UserHomeDir()
-			content = strings.Replace(content, home, "~", 1)
-			return styleResultText.Render(content)
-		}
-		return styleTree.Render(lines[0]+"\n") + styleTree.PaddingLeft(3).Render(strings.Join(lines[1:4], "\n")+"\n...")
-	}
-
-	var sb strings.Builder
-	oldlines := strings.Split(codeChanges[1], "\n")
-	newlines := strings.Split(codeChanges[0], "\n")
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Red).Render(fmt.Sprintf("-%d", len(oldlines))) + " " + lipgloss.NewStyle().Foreground(lipgloss.Green).Render(fmt.Sprintf("+%d", len(newlines))) + "\n")
-
-	if len(newlines) > 4 {
-		newlines = newlines[:4]
-		newlines = append(newlines, "...")
-	}
-	if len(oldlines) > 4 {
-		oldlines = oldlines[:4]
-		oldlines = append(oldlines, "...")
-	}
-	for _, line := range oldlines {
-		sb.WriteString(styleRemoved.Width(width).Render("- " + line))
-		sb.WriteString("\n")
-	}
-	for _, line := range newlines {
-		sb.WriteString(styleAdded.Width(width).Render("+ " + line))
-		sb.WriteString("\n")
-	}
-	return sb.String()
-}
-
-var lightcodeGlamourStyle = []byte(`{
-  "document": {
-    "block_prefix": "",
-    "block_suffix": "",
-    "color": "252",
-    "margin": 0
-  },
-  "block_quote": {
-    "indent": 1,
-    "indent_token": "│ ",
-    "color": "243",
-    "italic": true
-  },
-  "paragraph": {},
-  "list": {
-    "level_indent": 2
-  },
-  "heading": {
-    "block_suffix": "\n",
-    "bold": true
-  },
-  "h1": {
-    "prefix": " ",
-    "suffix": " ",
-    "color": "232",
-    "background_color": "43",
-    "bold": true
-  },
-  "h2": {
-    "prefix": "▌ ",
-    "color": "86",
-    "bold": true
-  },
-  "h3": {
-    "prefix": "◆ ",
-    "color": "43",
-    "bold": true
-  },
-  "h4": {
-    "prefix": "◇ ",
-    "color": "37",
-    "bold": false
-  },
-  "h5": {
-    "prefix": "· ",
-    "color": "244"
-  },
-  "h6": {
-    "prefix": "· ",
-    "color": "241"
-  },
-  "text": {},
-  "strikethrough": { "crossed_out": true },
-  "emph": { "italic": true, "color": "245" },
-  "strong": { "bold": true, "color": "255" },
-  "hr": {
-    "color": "237",
-    "format": "\n──────────────────────────────────────\n"
-  },
-  "item": { "block_prefix": "• " },
-  "enumeration": { "block_prefix": ". " },
-  "task": { "ticked": "[✓] ", "unticked": "[ ] " },
-  "link": { "color": "51", "underline": true },
-  "link_text": { "color": "43", "bold": true },
-  "image": { "color": "212", "underline": true },
-  "image_text": { "color": "243", "format": "Image: {{.text}} →" },
-  "code": {
-    "prefix": " ",
-    "suffix": " ",
-    "color": "215",
-    "background_color": "235"
-  },
-  "code_block": {
-    "color": "252",
-    "margin": 2,
-    "chroma": {
-      "text":                { "color": "#C4C4C4" },
-      "error":               { "color": "#F1F1F1", "background_color": "#F05B5B" },
-      "comment":             { "color": "#606060" },
-      "comment_preproc":     { "color": "#FF875F" },
-      "keyword":             { "color": "#41f7fa" },
-      "keyword_reserved":    { "color": "#FF5FD2" },
-      "keyword_namespace":   { "color": "#FF5F87" },
-      "keyword_type":        { "color": "#86D0D0" },
-      "operator":            { "color": "#8BE28B" },
-      "punctuation":         { "color": "#C8C8A0" },
-      "name":                { "color": "#C4C4C4" },
-      "name_builtin":        { "color": "#FF8EC7" },
-      "name_tag":            { "color": "#86D0D0" },
-      "name_attribute":      { "color": "#7A7AE6" },
-      "name_class":          { "color": "#F1F1F1", "underline": true, "bold": true },
-      "name_constant":       {},
-      "name_decorator":      { "color": "#FFFF87" },
-      "name_exception":      {},
-      "name_function":       { "color": "#41f7fa" },
-      "name_other":          {},
-      "literal_number":      { "color": "#6EEFC0" },
-      "literal_string":      { "color": "#C69669" },
-      "literal_string_escape": { "color": "#AFFFD7" },
-      "generic_deleted":     { "color": "#FD5B5B" },
-      "generic_emph":        { "italic": true },
-      "generic_inserted":    { "color": "#41f7fa" },
-      "generic_strong":      { "bold": true },
-      "generic_subheading":  { "color": "#888888" },
-      "background":          { "background_color": "#1e1e1e" }
-    }
-  },
-  "table": {},
-  "definition_list": {},
-  "definition_term": {},
-  "definition_description": { "block_prefix": "\n  → " },
-  "html_block": {},
-  "html_span": {}
-}`)
-
-func renderMessages(msgs []models.Message, width int) string {
-	if width <= 0 {
-		width = 80
-	}
-	r, _ := glamour.NewTermRenderer(glamour.WithWordWrap(width), glamour.WithStylesFromJSONBytes(lightcodeGlamourStyle))
-
-	dot := styleDot.Render("●")
-	tree := styleTree.Render("└─")
-
-	// Pre-pass: Find which tool calls in which messages have corresponding result messages
-	type callKey struct {
-		msgID string
-		idx   int
-	}
-	hasResult := make(map[callKey]bool)
-	var lastAssistantMsgID string
-	var callIdx int
-	for _, msg := range msgs {
-		d := models.DecodeMessageData(msg.Data)
-		if d.Role == "assistant" {
-			lastAssistantMsgID = fmt.Sprintf("%d", msg.ID)
-			callIdx = 0
-		} else if d.Role == "tool_call" && lastAssistantMsgID != "" {
-			hasResult[callKey{lastAssistantMsgID, callIdx}] = true
-			callIdx++
-		}
-	}
-
-	var lines []string
-	lines = append(lines, mascott())
-	for _, msg := range msgs {
-		d := models.DecodeMessageData(msg.Data)
-		if d.Role == "" || d.Role == "error" {
-			continue
-		}
-
-		if d.Content != "" {
-			content := d.Content
-			switch d.Role {
-			case "assistant":
-				content = html.UnescapeString(content)
-				re := regexp.MustCompile(`(?s)<think>(.*?)</think>`)
-				matches := re.FindAllString(content, -1)
-				matchedContent := strings.Join(matches, " ")
-				content = content[len(strings.Join(matches, " ")):]
-
-				if out, err := r.Render(content); err == nil {
-					content = strings.TrimSpace(out)
-				}
-				if matchedContent != "" {
-					matchedContent = strings.TrimSpace(matchedContent)
-					matchedContent = strings.ReplaceAll(matchedContent, "\n", "")
-					matchedContent = strings.Replace(matchedContent, "<think>", "", 1)
-					matchedContent = strings.Replace(matchedContent, "</think>", "", 1)
-					if len(matchedContent) > width {
-						matchedContent = "Thinking: " + matchedContent
-						formatted_data := styleThink.PaddingLeft(1).Render(matchedContent[:width]) + styleThink.Width(width).PaddingLeft(2).Width(width).Render(matchedContent[width:])
-						lines = append(lines, dot+formatted_data)
-					} else {
-						lines = append(lines, styleThink.Width(width).Render(matchedContent))
-					}
-
-				}
-				if content != "" {
-					// content = "Thinking: " + content
-					if len(content) > width {
-						formatted_data := styleThink.Width(width).PaddingLeft(1).Render(content[:width]) + styleThink.PaddingLeft(2).Width(width).Render(content[width:])
-						lines = append(lines, dot+formatted_data)
-					} else {
-						lines = append(lines, dot+styleThink.Width(width).Render(content))
-					}
-					lines = append(lines, dot+" "+content)
-				}
-
-				for _, tc := range d.ToolCalls {
-					// if !hasResult[callKey{fmt.Sprintf("%d", msg.ID), i}] {
-					lines = append(lines, dot+" "+formatToolCall(tc))
-					// }
-				}
-
-			case "tool_call":
-				// For tool results, render BOTH the call and the result
-				for _, toolcall := range d.ToolCalls {
-					lines = append(lines, dot+" "+formatToolCall(toolcall))
-					resultSummary := formatToolResult(content, d.CodeChanges, width, toolcall)
-					lines = append(lines, tree+" "+resultSummary)
-				}
-				// if len(d.ToolCalls) > 0 {
-				// 	lines = append(lines, dot+" "+formatToolCall(d.ToolCalls[0]))
-				// }
-
-			case "user":
-				lines = append(lines, "")
-				lines = append(lines, styleUser.Width(width).Render("> "+content))
-				lines = append(lines, "")
-			case "question":
-				qs := parseQuestions(content)
-				for _, q := range qs {
-					line := styleQuestionHeader.Render("? " + q.question)
-					if len(q.options) > 0 {
-						line += styleTree.Render(" [" + strings.Join(q.options, ", ") + "]")
-					}
-					lines = append(lines, line)
-				}
-			case "todo_status":
-				todos := models.DecodeToDoList(content)
-				lines = append(lines, renderTodoStatusBlock(dot, todos, width))
-			}
-		} else if d.Role == "assistant" && len(d.ToolCalls) > 0 {
-			// Assistant message with ONLY tool calls (no text content)
-			for i, tc := range d.ToolCalls {
-				if !hasResult[callKey{fmt.Sprintf("%d", msg.ID), i}] {
-					lines = append(lines, dot+" "+formatToolCall(tc))
-				}
-			}
-		}
-	}
-	return strings.Join(lines, "\n")
-}
-
-func waitForMessages(ch chan models.StoredMessageData) tea.Cmd {
-	return func() tea.Msg {
-		msg, ok := <-ch
-		if msg.Role == "error" {
-			return streamDoneMsg{}
-		}
-		if !ok {
-			return streamDoneMsg{}
-		}
-		return streamMessageMsg(msg)
-	}
-}
-
-type clearEscMsgMsg struct {
-}
-
-func clearEscMsg() tea.Cmd {
-	return func() tea.Msg {
-		return clearEscMsgMsg{}
-	}
-}
-
 func createPrompt(value string, m *model) string {
 	re := regexp.MustCompile(`\[pasted text #(\d+)\]`)
 	textareaValue := re.ReplaceAllStringFunc(value, func(match string) string {
@@ -970,102 +521,6 @@ func createPrompt(value string, m *model) string {
 		return match
 	})
 	return textareaValue
-}
-
-type refreshSessionsMsg struct {
-}
-
-func CmdHandler(cmd string, m *model) tea.Cmd {
-	switch cmd {
-	case "/sessions":
-		m.sessions = client.ListSession()
-		m.listSession.Refresh(m.sessions)
-		m.islistSessionWin = true
-		m.textarea.Reset()
-	case "/new_session":
-		m.currentSession = models.Session{ID: "", Title: "", Directory: "."}
-		m.messages = []models.Message{}
-		m.viewport.SetContent(renderMessages(m.messages, m.width))
-		m.textarea.Reset()
-		m.viewport.GotoBottom()
-		return func() tea.Msg { return refreshSessionsMsg{} }
-
-	case "/delete_session":
-		session_id := m.currentSession.ID
-		client.DeleteSession(session_id)
-		var newSessions []models.Session
-		for _, session := range m.sessions {
-			if session.ID != session_id {
-				newSessions = append(newSessions, session)
-			}
-		}
-		m.sessions = newSessions
-		m.currentSession = models.Session{ID: "", Title: "", Directory: "."}
-		m.messages = []models.Message{}
-		m.viewport.SetContent(renderMessages(m.messages, m.width))
-		m.textarea.Reset()
-		m.viewport.GotoBottom()
-		return func() tea.Msg { return refreshSessionsMsg{} }
-
-	case "/models":
-		m.textarea.Reset()
-		list, err := config.GetModels()
-		if err != nil {
-			list = []config.ResModel{}
-		}
-		m.modelsList = list
-		m.modelsListIndex = 0
-		m.isModelsListWin = true
-		m.textarea.Placeholder = "↑↓ select · Enter/Esc close"
-		m.textarea.Blur()
-		m.syncLayout()
-		return nil
-
-	case "/usage":
-		usageContent := "## Session Usage\n\nNo active session selected."
-		if m.currentSession.ID != "" {
-			sessionMessages := client.GetSessionData(m.currentSession.ID)
-			var promptTokens int64
-			var completionTokens int64
-			var totalTokens int64
-			messageCount := 0
-			for _, msg := range sessionMessages {
-				data := models.DecodeMessageData(msg.Data)
-				if data.Usage == nil {
-					continue
-				}
-				promptTokens += data.Usage.PromptTokens
-				completionTokens += data.Usage.CompletionTokens
-				totalTokens += data.Usage.TotalTokens
-				messageCount++
-			}
-
-			if messageCount == 0 {
-				usageContent = "## Session Usage\n\nNo token usage has been recorded for this session yet."
-			} else {
-				title := strings.TrimSpace(m.currentSession.Title)
-				if title == "" {
-					title = "Untitled Session"
-				}
-				usageContent = fmt.Sprintf(
-					"## Session Usage\n\n- Session: %s\n- Prompt tokens: %d\n- Completion tokens: %d\n- Total tokens: %d\n",
-					title,
-					promptTokens,
-					completionTokens,
-					totalTokens,
-				)
-			}
-		}
-		m.messages = append(m.messages, models.Message{
-			SessionID: m.currentSession.ID,
-			Data:      models.EncodeMessageData(models.StoredMessageData{Role: "assistant", Content: usageContent}),
-		})
-		m.viewport.SetContent(renderMessages(m.messages, m.width))
-		m.viewport.GotoBottom()
-		m.syncLayout()
-		return nil
-	}
-	return nil
 }
 
 func (m model) handleModelsListInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -1131,12 +586,6 @@ func parseQuestions(content string) []questionItem {
 	}
 	return questions
 }
-
-var (
-	styleQuestionHeader = lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Bold(true)
-	styleOptionNormal   = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	styleOptionSelected = lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Bold(true)
-)
 
 func (m model) renderQueueList() string {
 	header := styleTodoTitle.Render("Queue")
@@ -1269,27 +718,5 @@ func (m model) submitQuestionAnswers() (tea.Model, tea.Cmd) {
 		parts = append(parts, fmt.Sprintf("Q: %s\nA: %s", q.question, m.questionAnswers[i]))
 	}
 	answer := strings.Join(parts, "\n\n")
-
-	newMessage := client.SendMessage(m.currentSession.ID, answer)
-	m.messages = append(m.messages, newMessage)
-	m.viewport.SetContent(renderMessages(m.messages, m.width))
-
-	m.isGenerating = true
-	m.syncLayout()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	ch := client.ChatCompletion(ctx, m.currentSession.ID, answer, m.mode)
-	m.cancelStream = cancel
-	m.streamCh = ch
-	m.viewport.GotoBottom()
-	return m, tea.Batch(waitForMessages(ch), m.spinner.Tick)
-}
-
-func mascott() string {
-	return lipgloss.NewStyle().Foreground(lipgloss.Color("#41f7fa")).Render(`
-  ▐█████▌
-  █  █  █
- ▘▜█████▛▘▘
-   ▘▘ ▝▝ 
-`)
+	return m, m.beginGeneration(answer)
 }

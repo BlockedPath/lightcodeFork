@@ -1,1 +1,0 @@
-read and explain LICENSE and tell me what license it is

@@ -1,22 +1,37 @@
 package main
 
 import (
+	"context"
 	"flag"
+	"fmt"
+	"math/rand"
 	"net"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/Kartik-2239/lightcode/internal/server"
+	"github.com/Kartik-2239/lightcode/internal/server/agent"
 	"github.com/Kartik-2239/lightcode/internal/server/config"
+	"github.com/Kartik-2239/lightcode/internal/server/db"
+	"github.com/Kartik-2239/lightcode/internal/server/db/models"
 	"github.com/Kartik-2239/lightcode/internal/tui/views"
 )
 
 func main() {
-	isServer := flag.Bool("server", false, "to run the server only")
-	isTui := flag.Bool("tui", false, "to run the tui only")
-	flag.Parse()
-	Lightcode(!*isTui, !*isServer)
+	var prompt string
+	flag.StringVar(&prompt, "prompt", "", "prompt for the agent")
+	flag.StringVar(&prompt, "p", "", "prompt for the agent (shorthand)")
 
+	flag.Parse()
+	if prompt == "" {
+		Lightcode(true, true)
+		return
+	}
+	// fmt.Println(prompt)
+	runAgent(prompt)
 }
+
 func isPortInUse(port string) bool {
 	ln, err := net.Listen("tcp", ":"+port)
 	if err != nil {
@@ -40,4 +55,38 @@ func Lightcode(isServer bool, isTui bool) {
 	if isTui {
 		views.LauchHomePage()
 	}
+}
+
+func runAgent(prompt string) {
+	ctx := context.Background()
+	database, _ := db.Connect()
+	session_id := randomSessionID()
+	path, err := os.Getwd()
+	if err != nil {
+		fmt.Println("couldn't create a session")
+	}
+	session := models.Session{ID: session_id, Title: prompt, Directory: path}
+	database.Create(&session)
+
+	var messages []models.Message
+	database.Table("messages").Select("*").Where("session_id = ?", session_id).Find(&messages)
+	newMessage := models.Message{SessionID: session_id, Data: models.EncodeMessageData(models.StoredMessageData{Role: "user", Content: prompt})}
+
+	database.Create(&newMessage)
+	for result := range agent.New().Run(ctx, prompt, session_id, "chat") {
+		fmt.Println(result.Content)
+		for _, tool := range result.ToolCalls {
+			fmt.Printf("%s({%s})", tool.Name, tool.Arguments)
+		}
+	}
+}
+
+func randomSessionID() string {
+	var chars = "qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890-_"
+	length := 10
+	var result strings.Builder
+	for range length {
+		result.WriteString(string(chars[rand.Intn(len(chars))]))
+	}
+	return result.String()
 }
