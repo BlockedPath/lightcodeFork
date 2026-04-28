@@ -76,6 +76,7 @@ func initialModel() ModelCmdList {
 		item("skills"),
 		item("editor"),
 		item("models"),
+		item("usage"),
 	}
 
 	const defaultWidth = 20

@@ -89,5 +89,8 @@ go run ./cmd/lightcode/main.go
 - [ ] break the ui into more manageable parts
 - [ ] follow a theme of ui
 - [ ] add model selections, from the ui, like add models with api keys
+- [x] handle space under dot
 - [x] Agents.md
-- [ ] /usage command
+- [x] /usage command
+- [ ] context compaction
+

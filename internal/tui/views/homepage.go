@@ -1,8 +1,5 @@
 package views
 
-// A simple program demonstrating the text area component from the Bubbles
-// component library.
-
 import (
 	"context"
 	"encoding/json"
@@ -674,7 +671,7 @@ func formatToolResult(content string, codeChanges []string, width int, tc models
 			content = strings.Replace(content, home, "~", 1)
 			return styleResultText.Render(content)
 		}
-		return styleTree.Render(strings.Join(lines[:4], "\n") + "\n...")
+		return styleTree.Render(lines[0]+"\n") + styleTree.PaddingLeft(3).Render(strings.Join(lines[1:4], "\n")+"\n...")
 	}
 
 	var sb strings.Builder
@@ -870,17 +867,30 @@ func renderMessages(msgs []models.Message, width int) string {
 					matchedContent = strings.ReplaceAll(matchedContent, "\n", "")
 					matchedContent = strings.Replace(matchedContent, "<think>", "", 1)
 					matchedContent = strings.Replace(matchedContent, "</think>", "", 1)
-					lines = append(lines, dot+" Thinking: "+styleThink.Width(width).Render(matchedContent))
+					if len(matchedContent) > width {
+						matchedContent = "Thinking: " + matchedContent
+						formatted_data := styleThink.PaddingLeft(1).Render(matchedContent[:width]) + styleThink.Width(width).PaddingLeft(2).Width(width).Render(matchedContent[width:])
+						lines = append(lines, dot+formatted_data)
+					} else {
+						lines = append(lines, styleThink.Width(width).Render(matchedContent))
+					}
+
 				}
 				if content != "" {
+					// content = "Thinking: " + content
+					if len(content) > width {
+						formatted_data := styleThink.Width(width).PaddingLeft(1).Render(content[:width]) + styleThink.PaddingLeft(2).Width(width).Render(content[width:])
+						lines = append(lines, dot+formatted_data)
+					} else {
+						lines = append(lines, dot+styleThink.Width(width).Render(content))
+					}
 					lines = append(lines, dot+" "+content)
 				}
 
-				// Only render tool calls that don't have results yet
-				for i, tc := range d.ToolCalls {
-					if !hasResult[callKey{fmt.Sprintf("%d", msg.ID), i}] {
-						lines = append(lines, dot+" "+formatToolCall(tc))
-					}
+				for _, tc := range d.ToolCalls {
+					// if !hasResult[callKey{fmt.Sprintf("%d", msg.ID), i}] {
+					lines = append(lines, dot+" "+formatToolCall(tc))
+					// }
 				}
 
 			case "tool_call":
@@ -1008,6 +1018,50 @@ func CmdHandler(cmd string, m *model) tea.Cmd {
 		m.isModelsListWin = true
 		m.textarea.Placeholder = "↑↓ select · Enter/Esc close"
 		m.textarea.Blur()
+		m.syncLayout()
+		return nil
+
+	case "/usage":
+		usageContent := "## Session Usage\n\nNo active session selected."
+		if m.currentSession.ID != "" {
+			sessionMessages := client.GetSessionData(m.currentSession.ID)
+			var promptTokens int64
+			var completionTokens int64
+			var totalTokens int64
+			messageCount := 0
+			for _, msg := range sessionMessages {
+				data := models.DecodeMessageData(msg.Data)
+				if data.Usage == nil {
+					continue
+				}
+				promptTokens += data.Usage.PromptTokens
+				completionTokens += data.Usage.CompletionTokens
+				totalTokens += data.Usage.TotalTokens
+				messageCount++
+			}
+
+			if messageCount == 0 {
+				usageContent = "## Session Usage\n\nNo token usage has been recorded for this session yet."
+			} else {
+				title := strings.TrimSpace(m.currentSession.Title)
+				if title == "" {
+					title = "Untitled Session"
+				}
+				usageContent = fmt.Sprintf(
+					"## Session Usage\n\n- Session: %s\n- Prompt tokens: %d\n- Completion tokens: %d\n- Total tokens: %d\n",
+					title,
+					promptTokens,
+					completionTokens,
+					totalTokens,
+				)
+			}
+		}
+		m.messages = append(m.messages, models.Message{
+			SessionID: m.currentSession.ID,
+			Data:      models.EncodeMessageData(models.StoredMessageData{Role: "assistant", Content: usageContent}),
+		})
+		m.viewport.SetContent(renderMessages(m.messages, m.width))
+		m.viewport.GotoBottom()
 		m.syncLayout()
 		return nil
 	}
