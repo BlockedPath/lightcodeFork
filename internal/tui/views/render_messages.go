@@ -99,6 +99,7 @@ func formatToolResult(content string, codeChanges []string, width int, tc models
 	}
 	if len(oldlines) > 4 {
 		oldlines = oldlines[:4]
+
 		oldlines = append(oldlines, "...")
 	}
 	for _, line := range oldlines {
