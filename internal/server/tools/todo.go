@@ -71,39 +71,39 @@ func UpdateTodo(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 }
 
 func init() {
-	Register("create_todo", ToolDef{
-		Name:        "create_todo",
-		Description: "Create a todo list by providing a list of string descriptions in order",
-		Params: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"descriptions": map[string]any{
-					"type": "array",
-					"items": map[string]any{
-						"type":        "string",
-						"description": "The description of the todo",
-					},
-				},
-			},
-			"required": []string{"descriptions"},
-		},
-	}, CreateTodo)
-	Register("update_todo", ToolDef{
-		Name:        "update_todo",
-		Description: "Update a todo by providing an index and a completed boolean, only provide the data of a specific item in the list not all the fucking items in the list, only ONE AT A TIME.",
-		Params: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"index": map[string]any{
-					"type":        "integer",
-					"description": "The index of the todo to update",
-				},
-				"completed": map[string]any{
-					"type":        "boolean",
-					"description": "The completed status of the todo",
-				},
-			},
-			"required": []string{"index", "completed"},
-		},
-	}, UpdateTodo)
+	// Register("create_todo", ToolDef{
+	// 	Name:        "create_todo",
+	// 	Description: "Create a todo list by providing a list of string descriptions in order",
+	// 	Params: map[string]any{
+	// 		"type": "object",
+	// 		"properties": map[string]any{
+	// 			"descriptions": map[string]any{
+	// 				"type": "array",
+	// 				"items": map[string]any{
+	// 					"type":        "string",
+	// 					"description": "The description of the todo",
+	// 				},
+	// 			},
+	// 		},
+	// 		"required": []string{"descriptions"},
+	// 	},
+	// }, CreateTodo)
+	// Register("update_todo", ToolDef{
+	// 	Name:        "update_todo",
+	// 	Description: "Update a todo by providing an index and a completed boolean, only provide the data of a specific item in the list not all the fucking items in the list, only ONE AT A TIME.",
+	// 	Params: map[string]any{
+	// 		"type": "object",
+	// 		"properties": map[string]any{
+	// 			"index": map[string]any{
+	// 				"type":        "integer",
+	// 				"description": "The index of the todo to update",
+	// 			},
+	// 			"completed": map[string]any{
+	// 				"type":        "boolean",
+	// 				"description": "The completed status of the todo",
+	// 			},
+	// 		},
+	// 		"required": []string{"index", "completed"},
+	// 	},
+	// }, UpdateTodo)
 }

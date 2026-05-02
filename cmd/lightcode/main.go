@@ -23,7 +23,18 @@ func main() {
 	flag.StringVar(&prompt, "prompt", "", "prompt for the agent")
 	flag.StringVar(&prompt, "p", "", "prompt for the agent (shorthand)")
 
+	isServer := flag.Bool("server", false, "")
+	isTui := flag.Bool("tui", false, "")
+
 	flag.Parse()
+	if *isServer {
+		Lightcode(true, false)
+		return
+	}
+	if *isTui {
+		Lightcode(false, true)
+		return
+	}
 	if prompt == "" {
 		Lightcode(true, true)
 		return
@@ -45,10 +56,14 @@ func Lightcode(isServer bool, isTui bool) {
 	if !isPortInUse(port) {
 		_, err := http.Get("http://localhost:" + port)
 		if err != nil {
-			if isServer {
+			if isServer && isTui {
 				ready := make(chan struct{})
 				go server.Initialise(ready, port)
 				<-ready
+			}
+			if isServer && !isTui {
+				ready := make(chan struct{})
+				server.Initialise(ready, port)
 			}
 		}
 	}

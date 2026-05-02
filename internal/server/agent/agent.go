@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/Kartik-2239/lightcode/internal/server/db"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
@@ -13,7 +14,8 @@ import (
 )
 
 const MaxIterations = 25
-const DEBUG = true
+const DEBUG = false
+const CONTEXT_WINDOW int64 = 128_000
 
 type Agent struct{}
 
@@ -46,7 +48,7 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode 
 	go func() {
 		defer close(ch)
 
-		for i := 0; i < MaxIterations; i++ {
+		for i := range MaxIterations {
 
 			select {
 			case <-ctx.Done():
@@ -59,8 +61,30 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode 
 			var messages []models.Message
 			database.Where("session_id = ?", session_id).Find(&messages)
 			chats := make([]llm.Chat, 0, len(messages)+2) // +2 for agents.md and todo list
+
+			// before starting the agent check if the token usage till the last memory compaction.
+			/*
+				token_count := 0
+				for _, message := range messages {
+					d := models.DecodeMessageData(message.Data)
+					token_count += d.Usage.TotalTokens
+				}
+			*/
+			var token_count int64 = 0
+			slices.Reverse(messages)
+
 			for _, message := range messages {
 				d := models.DecodeMessageData(message.Data)
+				// if DEBUG {
+				// 	fmt.Println("token_count", token_count)
+				// }
+				if strings.HasPrefix(d.Content, "<memory>") && strings.HasSuffix(d.Content, "</memory>") {
+					chats = append(chats, llm.Chat{
+						Role:    "user",
+						Content: d.Content,
+					})
+					break
+				}
 				switch d.Role {
 				case "tool_call":
 					name, id := "tool", ""
@@ -75,21 +99,54 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode 
 				case "assistant":
 					content := d.Content
 					chats = append(chats, llm.Chat{Role: "assistant", Content: content})
+					// token_count += d.Usage.CompletionTokens
 				default:
-					chats = append(chats, llm.Chat{Role: d.Role, Content: d.Content})
+					// if i > 1 && i < len(messages) {
+					// 	token_count += predictTokenCount(messages, i)
+					// }
+					chats = append(chats, llm.Chat{Role: "user", Content: d.Content})
 				}
 			}
+			slices.Reverse(chats)
+			slices.Reverse(messages)
+
+			// memory compaction shit
+			token_count = predictTokenCount(messages, len(messages)-1)
+			if DEBUG {
+				fmt.Println("token_count", token_count)
+			}
+			if token_count >= CONTEXT_WINDOW {
+				// leave the last few chats before compacting memory
+				compactedMemory, err := compactMemory(chats)
+				if err != nil {
+					if DEBUG {
+						fmt.Println("Failed compacting memory with error : ", err)
+					}
+				}
+				compactedMsg := models.Message{ // wrap it
+					SessionID: session_id,
+					Data:      models.EncodeMessageData(compactedMemory),
+				}
+
+				if err := database.Create(&compactedMsg).Error; err != nil {
+					if DEBUG {
+						fmt.Println("Error creating message:", err, "?")
+					}
+				}
+				ch <- models.StoredMessageData{Role: "assistant", Content: "Compacting context"}
+				continue
+			}
+
 			var session models.Session
 			database.Where("id = ?", session_id).First(&session)
-			cur_list := session.ToDoList
-			chats = append(chats, llm.Chat{Role: "user", Content: cur_list})
+			// cur_list := session.ToDoList
+			// chats = append(chats, llm.Chat{Role: "user", Content: cur_list})
 			agents_md, err := ReadAgentsMd(session.Directory)
 			if err != nil {
 				slices.Reverse(chats)
 				chats = append(chats, llm.Chat{Role: "user", Content: fmt.Sprintf("<agents_md>%s<agents_md>", agents_md)})
 				slices.Reverse(chats)
 			}
-
 			resp, err := llm.ApiCall(ctx, "", chats, mode)
 			if err != nil {
 				errorMessage := models.StoredMessageData{Role: "error", Content: resp.Text, Usage: &models.StoredUsage{}}

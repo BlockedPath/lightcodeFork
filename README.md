@@ -9,6 +9,10 @@ Lightcode is a light weight **coding agent** written in Go.
 - [Go](https://go.dev/dl/) **1.25+**
 - At least one OpenAI-compatible endpoint configured (see **Models** below)
 
+## Install
+
+Run `go install github.com/Kartik-2239/lightcode/cmd/lightcode@latest`
+
 ## Configuration
 
 Settings live under **`~/.lightcode/`**. The app creates this directory and a default **`config.json`** on first run.
@@ -38,7 +42,7 @@ Example:
   ]
 ```
 
-- In the TUI, run **`/models`** to select one of the models
+- In the TUI, run **`/models`** to select one of the models after adding the models in config.json.
 
 ### Skills (greatly improves performance)
 
@@ -92,6 +96,16 @@ go run ./cmd/lightcode/main.go
 - [x] /usage command
 - [x] add flags like -p for prompting and -id and all for session id and run the cli that way
 
+- [x] prevent random stopping of agent loop
+- [x] add context compaction
+- [x] fix same message twice bug
+
+- [ ] manage context better and improve quality
+
 - [ ] add model selections, from the ui, like add models with api keys
 - [ ] File tracker
+
+
+
+
 

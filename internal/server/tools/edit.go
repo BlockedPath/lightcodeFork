@@ -60,7 +60,7 @@ func Edit(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 		return ToolResponse{Content: "Error: " + err.Error()}, err
 	}
 
-	return ToolResponse{Content: strings.Join([]string{"old_string: ", oldString, "new_string: ", copyNewString}, "\n"), CodeChanges: []string{oldString, copyNewString}}, nil
+	return ToolResponse{Content: strings.Join([]string{"old_string: ", oldString, "========", "new_string: ", copyNewString}, "\n"), CodeChanges: []string{"---" + oldString, "+++" + copyNewString}}, nil
 }
 
 func init() {

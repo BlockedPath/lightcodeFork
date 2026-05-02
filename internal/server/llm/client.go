@@ -46,18 +46,21 @@ func ApiCall(ctx context.Context, input string, chats []Chat, mode string) (Resp
 	}
 
 	for _, c := range chats {
-		switch c.Role {
-		case "user":
-			messages = append(messages, openai.UserMessage(c.Content))
-		case "assistant":
-			messages = append(messages, openai.AssistantMessage(c.Content))
-		case "tool":
-			messages = append(messages, openai.ToolMessage(c.Content, c.ToolCallID))
+		if c.Content != "" {
+			switch c.Role {
+			case "user":
+				messages = append(messages, openai.UserMessage(c.Content))
+			case "assistant":
+				messages = append(messages, openai.AssistantMessage(c.Content))
+			case "tool":
+				messages = append(messages, openai.ToolMessage(c.Content, c.ToolCallID))
+			}
 		}
+
 	}
-	if input != "" {
-		messages = append(messages, openai.UserMessage(input))
-	}
+	// if input != "" {
+	// 	messages = append(messages, openai.UserMessage(input))
+	// }
 	cur_model, err := config.GetCurrentModel()
 	if err != nil {
 		return Response{

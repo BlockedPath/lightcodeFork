@@ -89,8 +89,11 @@ func formatToolResult(content string, codeChanges []string, width int, tc models
 	}
 
 	var sb strings.Builder
-	oldlines := strings.Split(codeChanges[0], "\n")
-	newlines := strings.Split(codeChanges[1], "\n")
+	var oldlines []string
+	var newlines []string
+	oldlines = strings.Split(codeChanges[0], "\n")
+	newlines = strings.Split(codeChanges[1], "\n")
+
 	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Red).Render(fmt.Sprintf("-%d", len(oldlines))) + " " + lipgloss.NewStyle().Foreground(lipgloss.Green).Render(fmt.Sprintf("+%d", len(newlines))) + "\n")
 
 	if len(newlines) > 4 {
@@ -283,37 +286,45 @@ func renderMessages(msgs []models.Message, width int) string {
 					matchedContent = strings.Replace(matchedContent, "</think>", "", 1)
 					if len(matchedContent) > width {
 						matchedContent = "Thinking: " + matchedContent
-						formattedData := styleThink.PaddingLeft(1).Render(matchedContent[:width]) + styleThink.Width(width).PaddingLeft(2).Width(width).Render(matchedContent[width:])
+						formattedData := styleThink.PaddingLeft(1).Width(width-1).Render(matchedContent[:width-1]) + styleThink.Width(width-2).PaddingLeft(2).Width(width).Render(matchedContent[width-1:])
 						lines = append(lines, dot+formattedData)
 					} else {
 						lines = append(lines, styleThink.Width(width).Render(matchedContent))
 					}
 				}
 				if content != "" {
-					if len(content) > width {
-						formattedData := styleThink.Width(width).PaddingLeft(1).Render(content[:width]) + styleThink.PaddingLeft(2).Width(width).Render(content[width:])
-						lines = append(lines, dot+formattedData)
-					} else {
-						lines = append(lines, dot+styleThink.Width(width).Render(content))
+					if !strings.HasPrefix(content, "<memory>") && !strings.HasSuffix(content, "</memory>") {
+						if len(content) > width {
+
+							rest := styleThink.Width(width).UnsetMaxWidth().Render(strings.ReplaceAll(content, "\n", "\n  "))
+							lines = append(lines, dot+" "+rest)
+						} else {
+							lines = append(lines, dot+" "+styleThink.Width(width).Render(content))
+						}
 					}
-					lines = append(lines, dot+" "+content)
+
 				}
 
-				for _, tc := range d.ToolCalls {
-					lines = append(lines, dot+" "+formatToolCall(tc))
-				}
+				// for _, tc := range d.ToolCalls {
+				// 	lines = append(lines, dot+" "+formatToolCall(tc))
+				// }
 
 			case "tool_call":
 				for _, toolcall := range d.ToolCalls {
 					lines = append(lines, dot+" "+formatToolCall(toolcall))
 					resultSummary := formatToolResult(content, d.CodeChanges, width, toolcall)
-					lines = append(lines, tree+" "+resultSummary)
+					if resultSummary != "" {
+						lines = append(lines, tree+" "+resultSummary)
+					}
+
 				}
 
 			case "user":
-				lines = append(lines, "")
-				lines = append(lines, styleUser.Width(width).Render("> "+content))
-				lines = append(lines, "")
+				if !strings.HasPrefix(content, "<memory>") && !strings.HasSuffix(content, "</memory>") {
+					lines = append(lines, "")
+					lines = append(lines, styleUser.Width(width).Render("> "+content))
+					lines = append(lines, "")
+				}
 			case "question":
 				qs := parseQuestions(content)
 				for _, q := range qs {

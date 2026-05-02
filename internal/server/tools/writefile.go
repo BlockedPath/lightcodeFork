@@ -34,7 +34,7 @@ func WriteFile(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	if err != nil {
 		return ToolResponse{Content: "Error: " + err.Error()}, err
 	}
-	return ToolResponse{Content: "File written successfully", CodeChanges: []string{"", content}}, nil
+	return ToolResponse{Content: fmt.Sprintf("%s written successfully", path), CodeChanges: []string{"", content}}, nil
 }
 
 func init() {
