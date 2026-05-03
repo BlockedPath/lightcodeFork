@@ -67,7 +67,7 @@ func formatToolCall(tc models.StoredToolCall) string {
 	if tc.Name == "write_file" || tc.Name == "edit" || tc.Name == "skill" {
 		return styleToolName.Render(tc.Name)
 	}
-	return styleToolName.Render(tc.Name) + "(" + styleTree.Render(values) + ")"
+	return styleToolName.Render(tc.Name) + "()" //+ "(" + styleTree.Render(values) + ")"
 }
 
 func formatToolResult(content string, codeChanges []string, width int, tc models.StoredToolCall) string {

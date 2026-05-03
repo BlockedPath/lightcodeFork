@@ -34,6 +34,8 @@ func CmdHandler(cmd string, m *model) tea.Cmd {
 	case "/usage":
 		appendUsageMessage(m)
 		return nil
+	default:
+		return nil
 	}
 	return nil
 }

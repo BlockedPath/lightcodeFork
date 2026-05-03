@@ -47,6 +47,7 @@ Example:
 ### Skills (greatly improves performance)
 
 Put skills in **`~/.lightcode/skills/`**, each in its own subdirectory containing a **`SKILL.md`** file.
+Or enter path to som other skill directory in `~/.lightcode/config.json`.
 
 ### Server Port
 
@@ -64,7 +65,7 @@ Run the **API server** (by default listens on **`:8080`**) and **TUI**:
 go run ./cmd/lightcode/main.go
 ```
 
-
+<!-- 
 ## Todo
 
 - [x] copy paste multiple lines into a [ paste #1 13 lines ]
@@ -101,11 +102,12 @@ go run ./cmd/lightcode/main.go
 - [x] fix same message twice bug
 
 - [ ] manage context better and improve quality
-- [ ] add images support - line 341 homepage.go
+- [x] add images support
+- [ ] show context under the chat input
 
 - [ ] add model selections, from the ui, like add models with api keys
 - [ ] File tracker
 
 
 
-
+ -->

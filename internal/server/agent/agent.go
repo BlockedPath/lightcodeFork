@@ -14,7 +14,7 @@ import (
 )
 
 const MaxIterations = 25
-const DEBUG = true
+const DEBUG = false
 const CONTEXT_WINDOW int64 = 128_000
 
 type Agent struct{}

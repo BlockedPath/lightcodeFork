@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/Kartik-2239/lightcode/internal/server/agent"
@@ -29,6 +30,7 @@ func Initialise(ready chan<- struct{}, port string) {
 	http.HandleFunc("POST /create-session", createSession)
 	http.HandleFunc("POST /delete-session", deleteSession)
 	http.HandleFunc("GET /get-current-todo-list", getCurrentTodoList)
+	http.HandleFunc("GET /get-context-size", getContextSize)
 	// http.ListenAndServe(":8080", nil)
 
 	ln, err := net.Listen("tcp", ":"+port)
@@ -148,6 +150,22 @@ func getCurrentTodoList(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(todos)
+}
+
+func getContextSize(w http.ResponseWriter, r *http.Request) {
+	database, _ := db.Connect()
+	var messages []models.Message
+	session_id := r.URL.Query().Get("session_id")
+	database.Table("messages").Select("*").Where("session_id = ?", session_id).Find(&messages)
+	slices.Reverse(messages)
+	var context_size int64
+	for _, m := range messages {
+		if models.DecodeMessageData(m.Data).Role == "assistant" {
+			context_size = models.DecodeMessageData(m.Data).Usage.PromptTokens
+			break
+		}
+	}
+	json.NewEncoder(w).Encode(context_size)
 }
 
 func randomSessionID() string {

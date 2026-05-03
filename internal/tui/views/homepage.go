@@ -255,8 +255,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cur_command := m.listCommands.Current()
 				m.islistCommandsWin = false
 				m.syncLayout()
-				cmd := CmdHandler("/"+cur_command, &m)
-				return m, cmd
+				if len(cur_command) > 1 {
+					cmd := CmdHandler("/"+cur_command, &m)
+					return m, cmd
+				}
+				return m, nil
+
 			default:
 				m.cache[m.cacheIndex] = m.textarea.Value()
 				var cmd tea.Cmd
@@ -499,7 +503,8 @@ func (m model) View() tea.View {
 	sections = append(sections, m.textarea.View())
 	if !m.islistCommandsWin {
 		s := strings.ToUpper(m.mode[:1]) + m.mode[1:]
-		sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.BrightMagenta).Bold(true).Render(s)+" "+lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Bold(false).Render(m.modelsList[m.modelsListIndex].Model))
+		model_name := m.modelsList[m.modelsListIndex].Model
+		sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.BrightMagenta).Bold(true).Render(s)+" "+lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Bold(false).Render(model_name))
 	}
 
 	if m.isGenerating {
