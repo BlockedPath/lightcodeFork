@@ -37,6 +37,11 @@ type questionItem struct {
 	options  []string
 }
 
+type queue struct {
+	prompt string
+	imgs   [][]byte
+}
+
 type model struct {
 	viewport          viewport.Model
 	islistSessionWin  bool
@@ -49,6 +54,8 @@ type model struct {
 	textarea          textarea.Model
 	pasteCounter      int
 	pastedTexts       map[int]string
+	imgPasteCounter   int
+	pastedImgs        map[int][]byte
 	senderStyle       lipgloss.Style
 	err               error
 	cache             map[int]string
@@ -74,7 +81,7 @@ type model struct {
 	modelsList        []config.ResModel
 	isModelsListWin   bool
 	modelsListIndex   int
-	queue             []string
+	queue             []queue //[]string
 }
 
 func initialModel() model {
@@ -164,6 +171,8 @@ func initialModel() model {
 		modelsList:        modelsList,
 		isModelsListWin:   false,
 		modelsListIndex:   currentModelIndex,
+		imgPasteCounter:   0,
+		pastedImgs:        make(map[int][]byte),
 	}
 	m.syncLayout()
 	return m
@@ -300,21 +309,31 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// m.sessions = client.ListSession()
 			// m.islistSessionWin = true
 
-		case "ctrl+v", "super+v":
+		case "ctrl+v", "meta+v":
 			curVal := m.textarea.Value()
 			err := clipboard.Init()
 			if err != nil {
 				panic(err)
 			}
 			textBytes := clipboard.Read(clipboard.FmtText)
+			imgBytes := clipboard.Read(clipboard.FmtImage)
+			nextVal := curVal
+			if imgBytes != nil {
+				m.imgPasteCounter++
+				m.pastedImgs[m.imgPasteCounter] = imgBytes
+				placeholder := fmt.Sprintf("[pasted img #%d]", m.imgPasteCounter)
+				nextVal = strings.TrimSpace(nextVal + " " + placeholder)
+			}
 			pasteValue := string(textBytes)
-			if strings.Count(pasteValue, "\n") > 1 {
+			if pasteValue == "" {
+				m.textarea.SetValue(nextVal)
+			} else if strings.Count(pasteValue, "\n") > 1 {
 				m.pasteCounter++
 				m.pastedTexts[m.pasteCounter] = pasteValue
 				placeholder := fmt.Sprintf("[pasted text #%d]", m.pasteCounter)
-				m.textarea.SetValue(curVal + " " + placeholder)
+				m.textarea.SetValue(strings.TrimSpace(nextVal + " " + placeholder))
 			} else {
-				m.textarea.SetValue(curVal + pasteValue)
+				m.textarea.SetValue(nextVal + pasteValue)
 			}
 			return m, nil
 		// case "shift+enter":
@@ -329,7 +348,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.ensureCurrentSession(m.textarea.Value())
 			if m.isGenerating == true {
-				m.queue = append(m.queue, createPrompt(strings.Trim(m.textarea.Value(), "\n"), &m))
+				// value, img_bytes := createPrompt(strings.Trim(m.textarea.Value(), "\n"), &m)
+				m.queue = append(m.queue, queue{prompt: m.textarea.Value()})
 				m.textarea.SetValue("")
 				m.syncLayout()
 				return m, nil
@@ -508,7 +528,7 @@ func (m model) View() tea.View {
 	return v
 }
 
-func createPrompt(value string, m *model) string {
+func createPrompt(value string, m *model) (string, [][]byte) {
 	re := regexp.MustCompile(`\[pasted text #(\d+)\]`)
 	textareaValue := re.ReplaceAllStringFunc(value, func(match string) string {
 		sub := re.FindStringSubmatch(match)
@@ -522,7 +542,27 @@ func createPrompt(value string, m *model) string {
 		}
 		return match
 	})
-	return textareaValue
+	re2 := regexp.MustCompile(`\[pasted img #(\d+)\]`)
+	imgBytes := make([][]byte, 0, len(re2.FindAllString(value, -1)))
+	textareaValue = re2.ReplaceAllStringFunc(textareaValue, func(match string) string {
+		sub := re2.FindStringSubmatch(match)
+		if len(sub) < 2 {
+			return match
+		}
+
+		idx, err := strconv.Atoi(sub[1])
+		if err != nil {
+			return match
+		}
+		if img, ok := m.pastedImgs[idx]; ok {
+			imgBytes = append(imgBytes, img)
+			return ""
+		}
+		return match
+	})
+
+	textareaValue = strings.Join(strings.Fields(textareaValue), " ")
+	return textareaValue, imgBytes
 }
 
 func (m model) handleModelsListInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -598,7 +638,7 @@ func (m model) renderQueueList() string {
 	}
 	for i, ent := range m.queue {
 		label := ent
-		lines = append(lines, styleOptionNormal.Render(" "+strconv.Itoa(i+1)+".) "+label))
+		lines = append(lines, styleOptionNormal.Render(" "+strconv.Itoa(i+1)+".) "+label.prompt))
 	}
 	return strings.Join(lines, "\n")
 }

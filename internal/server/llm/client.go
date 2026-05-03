@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 
 	"github.com/Kartik-2239/lightcode/internal/server/config"
@@ -29,7 +30,7 @@ type Chat struct {
 	ToolCallID string
 }
 
-func ApiCall(ctx context.Context, input string, chats []Chat, mode string) (Response, error) {
+func ApiCall(ctx context.Context, input string, chats []Chat, mode string, img_bytes [][]byte) (Response, error) {
 	var toolCalls []ToolCall
 	cur_model := config.GetCustomization().CurrentModel
 	client := openai.NewClient(option.WithAPIKey(cur_model.ApiKey), option.WithBaseURL(cur_model.BaseUrl))
@@ -58,9 +59,27 @@ func ApiCall(ctx context.Context, input string, chats []Chat, mode string) (Resp
 		}
 
 	}
-	// if input != "" {
-	// 	messages = append(messages, openai.UserMessage(input))
-	// }
+	parts := []openai.ChatCompletionContentPartUnionParam{}
+
+	if input != "" {
+		messages = append(messages, openai.UserMessage(input))
+	}
+	for _, img := range img_bytes {
+		b64 := base64.StdEncoding.EncodeToString(img)
+		// fmt.Println("======b64======")
+		// fmt.Println(b64)
+		// fmt.Println("======b64======")
+		parts = append(parts, openai.ImageContentPart(
+			openai.ChatCompletionContentPartImageImageURLParam{
+				URL:    "data:image/png;base64," + b64,
+				Detail: "auto",
+			},
+		))
+	}
+
+	if len(parts) > 0 {
+		messages = append(messages, openai.UserMessage(parts))
+	}
 	cur_model, err := config.GetCurrentModel()
 	if err != nil {
 		return Response{

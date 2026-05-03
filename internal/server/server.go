@@ -14,6 +14,10 @@ import (
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
 )
 
+type Request struct {
+	Images [][]byte `json:"images"`
+}
+
 func Initialise(ready chan<- struct{}, port string) {
 	http.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "lightcode is running!")
@@ -62,6 +66,12 @@ func sendMessage(w http.ResponseWriter, r *http.Request) {
 	database, _ := db.Connect()
 	session_id := r.URL.Query().Get("session_id")
 	message := r.URL.Query().Get("message")
+
+	var req Request
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+
+	}
 	var messages []models.Message
 	database.Table("messages").Select("*").Where("session_id = ?", session_id).Find(&messages)
 	newMessage := models.Message{SessionID: session_id, Data: models.EncodeMessageData(models.StoredMessageData{Role: "user", Content: message})}
@@ -93,12 +103,19 @@ func chatcompletion(w http.ResponseWriter, r *http.Request) {
 	session_id := r.URL.Query().Get("session_id")
 	prompt := r.URL.Query().Get("prompt")
 	mode := r.URL.Query().Get("mode")
+
+	var req Request
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+
+	}
+
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
 		return
 	}
-	for result := range agent.New().Run(r.Context(), prompt, session_id, mode) {
+	for result := range agent.New().Run(r.Context(), prompt, req.Images, session_id, mode) {
 		if r.Context().Err() != nil {
 			return
 		}

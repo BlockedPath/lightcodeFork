@@ -91,7 +91,7 @@ func apiCall(chats []llm.Chat) (string, error) {
 	if len(resp.Choices) == 0 {
 		return "Ran into an error while calling the LLM", err
 	}
-
+	fmt.Println("predicted compacted context", int(len(resp.Choices[0].Message.Content)/4))
 	return resp.Choices[0].Message.Content, nil
 }
 

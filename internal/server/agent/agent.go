@@ -14,7 +14,7 @@ import (
 )
 
 const MaxIterations = 25
-const DEBUG = false
+const DEBUG = true
 const CONTEXT_WINDOW int64 = 128_000
 
 type Agent struct{}
@@ -23,7 +23,7 @@ func New() *Agent {
 	return &Agent{}
 }
 
-func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode string) <-chan models.StoredMessageData {
+func (a *Agent) Run(ctx context.Context, prompt string, b64_imgs [][]byte, session_id string, mode string) <-chan models.StoredMessageData {
 	ch := make(chan models.StoredMessageData)
 	// currentPrompt := prompt
 	database, err := db.Connect()
@@ -56,6 +56,7 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode 
 			default:
 			}
 			if DEBUG {
+				fmt.Println(strings.Repeat("=", 30))
 				fmt.Println("Iteration:", i)
 			}
 			var messages []models.Message
@@ -75,9 +76,6 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode 
 
 			for _, message := range messages {
 				d := models.DecodeMessageData(message.Data)
-				// if DEBUG {
-				// 	fmt.Println("token_count", token_count)
-				// }
 				if strings.HasPrefix(d.Content, "<memory>") && strings.HasSuffix(d.Content, "</memory>") {
 					chats = append(chats, llm.Chat{
 						Role:    "user",
@@ -99,19 +97,24 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode 
 				case "assistant":
 					content := d.Content
 					chats = append(chats, llm.Chat{Role: "assistant", Content: content})
-					// token_count += d.Usage.CompletionTokens
 				default:
-					// if i > 1 && i < len(messages) {
-					// 	token_count += predictTokenCount(messages, i)
-					// }
 					chats = append(chats, llm.Chat{Role: "user", Content: d.Content})
 				}
 			}
 			slices.Reverse(chats)
 			slices.Reverse(messages)
-
-			// memory compaction shit
-			token_count = predictTokenCount(messages, len(messages)-1)
+			// memory compaction
+			if DEBUG {
+				for _, item := range messages[len(messages)-len(chats):] {
+					data := models.DecodeMessageData(item.Data).Content
+					if len(data) > 100 {
+						fmt.Println(data[:100])
+					} else {
+						fmt.Println(data)
+					}
+				}
+			}
+			token_count = predictTokenCount(messages[len(messages)-len(chats):], len(chats)-1)
 			if DEBUG {
 				fmt.Println("token_count", token_count)
 			}
@@ -147,7 +150,12 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode 
 				chats = append(chats, llm.Chat{Role: "user", Content: fmt.Sprintf("<agents_md>%s<agents_md>", agents_md)})
 				slices.Reverse(chats)
 			}
-			resp, err := llm.ApiCall(ctx, "", chats, mode)
+			var resp llm.Response
+			if i == 0 && len(b64_imgs) >= 0 && len(chats) > 2 {
+				resp, err = llm.ApiCall(ctx, prompt, chats[:len(chats)-2], mode, b64_imgs)
+			} else {
+				resp, err = llm.ApiCall(ctx, "", chats, mode, [][]byte{})
+			}
 			if err != nil {
 				errorMessage := models.StoredMessageData{Role: "error", Content: resp.Text, Usage: &models.StoredUsage{}}
 				ch <- errorMessage
@@ -159,10 +167,10 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode 
 			default:
 			}
 			if DEBUG {
-				fmt.Println("================================================")
-				fmt.Println("Tool calls:", resp.ToolCalls)
+				fmt.Println("")
+				// fmt.Println("Tool calls:", resp.ToolCalls)
 				fmt.Println("Number of tool calls:", len(resp.ToolCalls))
-				fmt.Println("================================================")
+				fmt.Println("")
 			}
 			if len(resp.ToolCalls) == 0 {
 				select {
@@ -205,7 +213,7 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode 
 			}
 			ch <- assistantMessage
 			if DEBUG {
-				fmt.Println("Creating message:", assistantMsg)
+				fmt.Println("Creating message:", resp.CompleteResponse.Usage)
 			}
 			if err := database.Create(&assistantMsg).Error; err != nil {
 				if DEBUG {
@@ -244,7 +252,11 @@ func (a *Agent) Run(ctx context.Context, prompt string, session_id string, mode 
 				}
 				database.Create(&toolMsg)
 				if DEBUG {
-					fmt.Println("Result of tool call:", result)
+					if len(result.Content) > 100 {
+						fmt.Println("Result of tool call:", result.Content[:100], ".....")
+					} else {
+						fmt.Println("Result of tool call:", result.Content)
+					}
 				}
 			}
 		}

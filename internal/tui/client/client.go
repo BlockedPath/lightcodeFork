@@ -2,6 +2,7 @@ package client
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -76,12 +77,19 @@ func CreateSession(prompt string) string {
 	return strings.TrimSpace(string(body))
 }
 
-func ChatCompletion(ctx context.Context, session_id string, prompt string, mode string) chan models.StoredMessageData {
+func ChatCompletion(ctx context.Context, session_id string, prompt string, mode string, img_bytes [][]byte) chan models.StoredMessageData {
 	ch := make(chan models.StoredMessageData)
 	go func() {
 		defer close(ch)
+		payload := map[string]interface{}{
+			"images": img_bytes,
+		}
+		bodybytes, err := json.Marshal(payload)
+		if err != nil {
+
+		}
 		url := baseUrl + "/chat-completion?session_id=" + url.QueryEscape(session_id) + "&prompt=" + url.QueryEscape(prompt) + "&mode=" + url.QueryEscape(mode)
-		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		req, err := http.NewRequestWithContext(ctx, "GET", url, bytes.NewReader(bodybytes))
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -111,8 +119,15 @@ func ChatCompletion(ctx context.Context, session_id string, prompt string, mode 
 	return ch
 }
 
-func SendMessage(session_id string, message string) models.Message {
-	resp, err := http.Post(baseUrl+"/send-message?session_id="+url.QueryEscape(session_id)+"&message="+url.QueryEscape(message), "application/json", nil)
+func SendMessage(session_id string, message string, img_bytes [][]byte) models.Message {
+	payload := map[string]interface{}{
+		"images": img_bytes,
+	}
+	bodybytes, err := json.Marshal(payload)
+	if err != nil {
+
+	}
+	resp, err := http.Post(baseUrl+"/send-message?session_id="+url.QueryEscape(session_id)+"&message="+url.QueryEscape(message), "application/json", bytes.NewReader(bodybytes))
 	if err != nil {
 		fmt.Println(err.Error())
 		return models.Message{}

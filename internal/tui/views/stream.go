@@ -54,13 +54,13 @@ func (m *model) beginGeneration(prompt string) tea.Cmd {
 	m.isGenerating = true
 	m.syncLayout()
 
-	textareaValue := createPrompt(strings.Trim(prompt, "\n"), m)
-	newMessage := client.SendMessage(m.currentSession.ID, textareaValue)
+	textareaValue, img_bytes := createPrompt(strings.Trim(prompt, "\n"), m)
+	newMessage := client.SendMessage(m.currentSession.ID, textareaValue, img_bytes)
 	m.messages = append(m.messages, newMessage)
 	m.refreshMessagesView()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	ch := client.ChatCompletion(ctx, m.currentSession.ID, textareaValue, m.mode)
+	ch := client.ChatCompletion(ctx, m.currentSession.ID, textareaValue, m.mode, img_bytes)
 	m.cancelStream = cancel
 	m.streamCh = ch
 	m.textarea.SetValue("")
@@ -94,5 +94,5 @@ func (m *model) runNextQueuedPrompt() tea.Cmd {
 	}
 	nextPrompt := m.queue[0]
 	m.queue = m.queue[1:]
-	return m.beginGeneration(nextPrompt)
+	return m.beginGeneration(nextPrompt.prompt)
 }

@@ -101,10 +101,10 @@ go run ./cmd/lightcode/main.go
 - [x] fix same message twice bug
 
 - [ ] manage context better and improve quality
+- [ ] add images support - line 341 homepage.go
 
 - [ ] add model selections, from the ui, like add models with api keys
 - [ ] File tracker
-
 
 
 

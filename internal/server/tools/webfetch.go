@@ -26,19 +26,19 @@ func WebFetch(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	return ToolResponse{Content: string(body)}, nil
 }
 
-func init() {
-	Register("web_fetch", ToolDef{
-		Name:        "web_fetch",
-		Description: "Fetch the contents of a web page",
-		Params: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"url": map[string]string{
-					"type":        "string",
-					"description": "The URL to fetch",
-				},
-			},
-			"required": []string{"url"},
-		},
-	}, WebFetch)
-}
+// func init() {
+// 	Register("web_fetch", ToolDef{
+// 		Name:        "web_fetch",
+// 		Description: "Fetch the contents of a web page",
+// 		Params: map[string]any{
+// 			"type": "object",
+// 			"properties": map[string]any{
+// 				"url": map[string]string{
+// 					"type":        "string",
+// 					"description": "The URL to fetch",
+// 				},
+// 			},
+// 			"required": []string{"url"},
+// 		},
+// 	}, WebFetch)
+// }
