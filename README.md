@@ -1,113 +1,132 @@
-# Lightcode
+<h1 align="center">Lightcode</h1>
+<p align="center">A lightweight terminal coding agent written in Go</p>
 
-Lightcode is a light weight **coding agent** written in Go.
+<p align="center">
+  <img alt="Go" src="https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat-square&logo=go&logoColor=white" />
+  <img alt="Bubble Tea" src="https://img.shields.io/badge/TUI-Bubble%20Tea-FFB300?style=flat-square" />
+  <img alt="OpenAI Compatible" src="https://img.shields.io/badge/API-OpenAI%20Compatible-10A37F?style=flat-square" />
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-MIT-black?style=flat-square" /></a>
+</p>
 
 ![Lightcode demo](assets/lightcode.gif)
+
+---
+
+## What is Lightcode?
+
+Lightcode is a terminal-based coding agent for developers. It connects to any OpenAI-compatible model provider.
+
+---
+
+## Features
+
+- **OpenAI-compatible** — works with any provider that speaks the OpenAI Chat Completions API (OpenAI, Anthropic via proxy, Ollama, LM Studio, etc.)
+- **Low memory usage** — uses less ram around 20-30 mb
+- **Skills** — uses specialized [agent-skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview).
+- **Multi-model support** — configure multiple providers and switch between models with `/models` inside the TUI
+
+---
 
 ## Requirements
 
 - [Go](https://go.dev/dl/) **1.25+**
-- At least one OpenAI-compatible endpoint configured (see **Models** below)
+- At least one OpenAI-compatible endpoint configured
+
+---
 
 ## Install
 
-Run `go install github.com/Kartik-2239/lightcode/cmd/lightcode@latest`
+```bash
+go install github.com/Kartik-2239/lightcode/cmd/lightcode@latest
+```
+
+---
+
+## Quick Start
+
+Run the **TUI** and **API server** together (defaults to `:8080`):
+
+```bash
+lightcode
+```
+
+Or run directly from source:
+
+```bash
+go run ./cmd/lightcode/main.go
+```
+
+On first run, Lightcode creates `~/.lightcode/` with a default `config.json`. Add your model provider details (see [Configuration](#configuration)) and you're ready to go.
+
+---
 
 ## Configuration
 
-Settings live under **`~/.lightcode/`**. The app creates this directory and a default **`config.json`** on first run.
+All settings live under **`~/.lightcode/config.json`**. The file is created automatically on first run.
 
-### Models
-
-Providers must speak the **OpenAI Chat Completions** API. Add entries to the `models` array in `~/.lightcode/config.json`. Each entry is an object with:
-
-Example:
+### Full example
 
 ```json
 {
   "theme": "light",
-  "skills_path": "choose_any_skill_path"
-  "port: "8000"
+  "skills_path": "~/.lightcode/skills",
+  "port": "8080",
   "providers": [
     {
-      "models": ["another-model-id"],
-      "base_url": "https://your-gateway.example/v1",
-      "api_key": "..."
+      "models": ["gpt-5.5"],
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "sk-..."
     },
     {
-      "models": ["another-model-id-2]",
+      "models": ["some-ai-800b"],
       "base_url": "https://your-gateway.example/v1",
-      "api_key": "..."
+      "api_key": "your-api-key"
     }
   ]
+}
 ```
 
-- In the TUI, run **`/models`** to select one of the models after adding the models in config.json.
+### Config reference
 
-### Skills (greatly improves performance)
+| Key | Default | Description |
+|-----|---------|-------------|
+| `theme` | `"light"` | UI theme — `"light"` or `"dark"` |
+| `skills_path`| `~/.lightcode/skills` | Path to your skills directory (or change it to another skill path) |
+| `port` | `"8080"` | Port for the local HTTP API server |
+| `providers` | `[]` | List of model providers (see below) |
 
-Put skills in **`~/.lightcode/skills/`**, each in its own subdirectory containing a **`SKILL.md`** file.
-Or enter path to som other skill directory in `~/.lightcode/config.json`.
+### Providers
 
-### Server Port
+Each entry in the `providers` array requires:
 
-The HTTP API defaults to port **8080**. To use a different port, Set `port` in  `~/.lightcode/config.json`.
+| Key | Description |
+|-----|-------------|
+| `models` | List of model IDs available at this endpoint |
+| `base_url` | Base URL of the OpenAI-compatible API |
+| `api_key` | API key for authentication |
 
-```bash
-go run ./cmd/lightcode/main.go
+Once configured, run `/models` inside the TUI to select your active model.
+
+---
+
+## Skills
+
+Skills give the agent domain-specific context and significantly improve response quality for specialized tasks.
+
+**To add a skill:**
+
+1. Create a subdirectory under `~/.lightcode/skills/`
+2. Add a `SKILL.md` file inside it describing the context or instructions
+
+```
+~/.lightcode/skills/
+├── golang/
+│   └── SKILL.md
+└── docker/
+    └── SKILL.md
 ```
 
-## Quick start
+You can also point `skills_path` in `config.json` to any other directory on your system.
 
-Run the **API server** (by default listens on **`:8080`**) and **TUI**:
+---
 
-```bash
-go run ./cmd/lightcode/main.go
-```
-
-<!-- 
-## Todo
-
-- [x] copy paste multiple lines into a [ paste #1 13 lines ]
-- [x] better tool and thinking formating
-- [x] Skills
-- [x] grep tool
-- [x] first make the ui work
-- [x] UI upgrades
-- [x] Make config files
-- [X] improve tools and make test
-- [x] Fix the database bug
-- [x] Limit accessible directory to working dir
-- [x] question tool - homepage 381, just need to create a ui and send chat completion request
-- [x] Show Code changes
-- [x] Plan mode - prompt and tool filter
-- [x] todo tool - handle in the ui and send it as context in agent.go 
-- [x] json data for model selection etc
-- [x] need to also integrate anthropic go sdk cause response format for tool calling in models like
- glm and claude (fixed without adding anthropic api)
-- [x] Add a nicer way to use multiple agents like plan, build etc.
-
-- [x] Check for credentials before making an api call in .env
-- [x] queue
-- [x] handle basic errors
-
-- [x] break the ui into more manageable parts
-- [x] handle space under dot
-- [x] AGENTS.md
-- [x] /usage command
-- [x] add flags like -p for prompting and -id and all for session id and run the cli that way
-
-- [x] prevent random stopping of agent loop
-- [x] add context compaction
-- [x] fix same message twice bug
-
-- [ ] manage context better and improve quality
-- [x] add images support
-- [ ] show context under the chat input
-
-- [ ] add model selections, from the ui, like add models with api keys
-- [ ] File tracker
-
-
-
- -->
