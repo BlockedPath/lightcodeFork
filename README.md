@@ -16,8 +16,6 @@
 
 Lightcode is a terminal-based coding agent for developers. It connects to any OpenAI-compatible model provider.
 
----
-
 ## Features
 
 - **OpenAI-compatible** — works with any provider that speaks the OpenAI Chat Completions API (OpenAI, Anthropic via proxy, Ollama, LM Studio, etc.)
@@ -25,14 +23,12 @@ Lightcode is a terminal-based coding agent for developers. It connects to any Op
 - **Skills** — uses specialized [agent-skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview).
 - **Multi-model support** — configure multiple providers and switch between models with `/models` inside the TUI
 
----
 
 ## Requirements
 
 - [Go](https://go.dev/dl/) **1.25+**
 - At least one OpenAI-compatible endpoint configured
 
----
 
 ## Install
 
@@ -40,7 +36,6 @@ Lightcode is a terminal-based coding agent for developers. It connects to any Op
 go install github.com/Kartik-2239/lightcode/cmd/lightcode@latest
 ```
 
----
 
 ## Quick Start
 
@@ -58,7 +53,6 @@ go run ./cmd/lightcode/main.go
 
 On first run, Lightcode creates `~/.lightcode/` with a default `config.json`. Add your model provider details (see [Configuration](#configuration)) and you're ready to go.
 
----
 
 ## Configuration
 
@@ -107,7 +101,6 @@ Each entry in the `providers` array requires:
 
 Once configured, run `/models` inside the TUI to select your active model.
 
----
 
 ## Skills
 
@@ -128,5 +121,4 @@ Skills give the agent domain-specific context and significantly improve response
 
 You can also point `skills_path` in `config.json` to any other directory on your system.
 
----
 
