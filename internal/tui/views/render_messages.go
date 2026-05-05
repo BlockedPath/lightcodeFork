@@ -53,21 +53,27 @@ func formatToolCall(tc models.StoredToolCall) string {
 	var args map[string]interface{}
 	err := json.Unmarshal([]byte(tc.Arguments), &args)
 	values := ""
-	for _, value := range args {
+	for key, value := range args {
 		cur := fmt.Sprintf("%v", value)
 		if filepath.IsAbs(cur) {
 			home, _ := os.UserHomeDir()
 			cur = strings.Replace(cur, home, "~", 1)
 		}
-		values = values + strings.TrimSpace(cur) + " "
+		if key == "path" || key == "filePath" {
+			values = values + strings.TrimSpace(cur)
+		}
+		if key == "command" {
+			values = values + strings.TrimSpace(cur)
+		}
+
 	}
 	if err != nil {
 		return styleToolName.Render(tc.Name) + "()"
 	}
-	if tc.Name == "write_file" || tc.Name == "edit" || tc.Name == "skill" {
-		return styleToolName.Render(tc.Name)
-	}
-	return styleToolName.Render(tc.Name) + "()" //+ "(" + styleTree.Render(values) + ")"
+	// if tc.Name == "write_file" || tc.Name == "edit" || tc.Name == "skill" {
+	// 	return styleToolName.Render(tc.Name)
+	// }
+	return styleToolName.Render(tc.Name) + "(" + styleTree.Render(values) + ")"
 }
 
 func formatToolResult(content string, codeChanges []string, width int, tc models.StoredToolCall) string {
@@ -321,9 +327,8 @@ func renderMessages(msgs []models.Message, width int) string {
 
 			case "user":
 				if !strings.HasPrefix(content, "<memory>") && !strings.HasSuffix(content, "</memory>") {
-					lines = append(lines, "")
-					lines = append(lines, styleUser.Width(width).Render("> "+content))
-					lines = append(lines, "")
+
+					lines = append(lines, styleUser.Width(width).Render("❯ "+content))
 				}
 			case "question":
 				qs := parseQuestions(content)
@@ -354,6 +359,5 @@ func mascot() string {
   ▐█████▌
   █  █  █
  ▘▜█████▛▘▘
-   ▘▘ ▝▝ 
-`)
+   ▘▘ ▝▝`)
 }

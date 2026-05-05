@@ -14,7 +14,8 @@ import (
 )
 
 const MaxIterations = 25
-const DEBUG = false
+
+// const DEBUG = false
 const CONTEXT_WINDOW int64 = 128_000
 
 type Agent struct{}
@@ -23,7 +24,7 @@ func New() *Agent {
 	return &Agent{}
 }
 
-func (a *Agent) Run(ctx context.Context, prompt string, b64_imgs [][]byte, session_id string, mode string) <-chan models.StoredMessageData {
+func (a *Agent) Run(ctx context.Context, prompt string, b64_imgs [][]byte, session_id string, mode string, DEBUG bool) <-chan models.StoredMessageData {
 	ch := make(chan models.StoredMessageData)
 	// currentPrompt := prompt
 	database, err := db.Connect()

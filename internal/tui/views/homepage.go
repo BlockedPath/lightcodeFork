@@ -43,50 +43,51 @@ type queue struct {
 }
 
 type model struct {
-	viewport          viewport.Model
-	islistSessionWin  bool
-	islistCommandsWin bool
-	listSession       components.Model
-	listCommands      components.ModelCmdList
-	sessions          []models.Session
-	currentSession    models.Session
-	messages          []models.Message
-	textarea          textarea.Model
-	pasteCounter      int
-	pastedTexts       map[int]string
-	imgPasteCounter   int
-	pastedImgs        map[int][]byte
-	senderStyle       lipgloss.Style
-	err               error
-	cache             map[int]string
-	cacheIndex        int
-	streamCh          chan models.StoredMessageData
-	width             int
-	height            int
-	bashMode          bool
-	streamch          chan models.StoredMessageData
-	cancelStream      context.CancelFunc
-	spinner           spinner.Model
-	isGenerating      bool
-	lastEsc           time.Time
-	showEscMsg        bool
-	questionMode      bool
-	questions         []questionItem
-	questionIdx       int
-	questionAnswers   []string
-	questionSelected  int
-	todoList          []models.ToDo
-	modes             []string
-	mode              string
-	modelsList        []config.ResModel
-	isModelsListWin   bool
-	modelsListIndex   int
-	queue             []queue //[]string
+	viewport           viewport.Model
+	islistSessionWin   bool
+	islistCommandsWin  bool
+	listSession        components.Model
+	listCommands       components.ModelCmdList
+	sessions           []models.Session
+	currentSession     models.Session
+	messages           []models.Message
+	textarea           textarea.Model
+	pasteCounter       int
+	pastedTexts        map[int]string
+	imgPasteCounter    int
+	pastedImgs         map[int][]byte
+	senderStyle        lipgloss.Style
+	err                error
+	cache              map[int]string
+	cacheIndex         int
+	streamCh           chan models.StoredMessageData
+	width              int
+	height             int
+	bashMode           bool
+	streamch           chan models.StoredMessageData
+	cancelStream       context.CancelFunc
+	spinner            spinner.Model
+	isGenerating       bool
+	lastEsc            time.Time
+	showEscMsg         bool
+	questionMode       bool
+	questions          []questionItem
+	questionIdx        int
+	questionAnswers    []string
+	questionSelected   int
+	todoList           []models.ToDo
+	modes              []string
+	mode               string
+	modelsList         []config.ResModel
+	isModelsListWin    bool
+	modelsListIndex    int
+	queue              []queue //[]string
+	currentContextSize int64
 }
 
 func initialModel() model {
 	ta := textarea.New()
-	ta.Placeholder = "Send a message..."
+	ta.Placeholder = "enter to send message · / commands"
 	ta.SetVirtualCursor(false)
 	ta.Focus()
 
@@ -105,8 +106,7 @@ func initialModel() model {
 	}
 
 	ta.SetWidth(width)
-	ta.SetHeight(3)
-
+	ta.SetHeight(4)
 	ta.SetStyles(s)
 
 	ta.ShowLineNumbers = false
@@ -126,7 +126,8 @@ func initialModel() model {
 	spin.Spinner = spinner.MiniDot
 	spin.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
-	modelsList, err := config.GetModels()
+	// modelsList, err := config.GetModels()
+	modelsList, err := client.GetModels()
 	if len(modelsList) == 0 {
 		fmt.Println("No models found, add models in ~/.lightcode/config.json")
 		os.Exit(1)
@@ -135,7 +136,8 @@ func initialModel() model {
 		modelsList = []config.ResModel{}
 	}
 
-	currentModel, err := config.GetCurrentModel()
+	// currentModel, err := config.GetCurrentModel()
+	currentModel, err := client.GetCurrentModel()
 	currentModelIndex := 0
 	if err == nil {
 		for i, model := range modelsList {
@@ -147,32 +149,33 @@ func initialModel() model {
 	}
 
 	m := model{
-		textarea:          ta,
-		pasteCounter:      0,
-		pastedTexts:       make(map[int]string),
-		messages:          []models.Message{},
-		cacheIndex:        0,
-		cache:             make(map[int]string),
-		viewport:          vp,
-		islistSessionWin:  false,
-		islistCommandsWin: false,
-		bashMode:          false,
-		listSession:       components.LaunchSessionList(sessionItems),
-		listCommands:      components.LaunchCommandList(),
-		sessions:          sessions,
-		senderStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
-		err:               nil,
-		width:             width,
-		spinner:           spin,
-		isGenerating:      false,
-		lastEsc:           time.Now(),
-		mode:              "chat",
-		modes:             []string{"chat", "plan", "assistant"},
-		modelsList:        modelsList,
-		isModelsListWin:   false,
-		modelsListIndex:   currentModelIndex,
-		imgPasteCounter:   0,
-		pastedImgs:        make(map[int][]byte),
+		textarea:           ta,
+		pasteCounter:       0,
+		pastedTexts:        make(map[int]string),
+		messages:           []models.Message{},
+		cacheIndex:         0,
+		cache:              make(map[int]string),
+		viewport:           vp,
+		islistSessionWin:   false,
+		islistCommandsWin:  false,
+		bashMode:           false,
+		listSession:        components.LaunchSessionList(sessionItems),
+		listCommands:       components.LaunchCommandList(),
+		sessions:           sessions,
+		senderStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
+		err:                nil,
+		width:              width,
+		spinner:            spin,
+		isGenerating:       false,
+		lastEsc:            time.Now(),
+		mode:               "chat",
+		modes:              []string{"chat", "plan", "assistant"},
+		modelsList:         modelsList,
+		isModelsListWin:    false,
+		modelsListIndex:    currentModelIndex,
+		imgPasteCounter:    0,
+		pastedImgs:         make(map[int][]byte),
+		currentContextSize: 0,
 	}
 	m.syncLayout()
 	return m
@@ -230,6 +233,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.messages = client.GetSessionData(m.currentSession.ID)
 				m.todoList = client.GetCurrentTodoList(m.currentSession.ID)
 				m.islistSessionWin = false
+				m.currentContextSize = client.GetContextSize(m.currentSession.ID)
 				m.syncLayout()
 				m.viewport.SetContent(renderMessages(m.messages, m.width))
 				m.viewport.GotoBottom()
@@ -255,8 +259,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cur_command := m.listCommands.Current()
 				m.islistCommandsWin = false
 				m.syncLayout()
+				m.listCommands.Filter("")
 				if len(cur_command) > 1 {
 					cmd := CmdHandler("/"+cur_command, &m)
+					m.textarea.SetValue("")
 					return m, cmd
 				}
 				return m, nil
@@ -359,6 +365,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			return m, m.beginGeneration(m.textarea.Value())
+		case "shift+enter":
+			m.textarea.SetValue(m.textarea.Value() + "\n")
+			if len(strings.Split(m.textarea.Value(), "\n")) > m.textarea.Height() {
+				m.textarea.SetHeight(m.textarea.Height() + 1)
+			}
+			m.syncLayout()
+			return m, nil
 		case "up", "down":
 			var cmd tea.Cmd
 			m.viewport, cmd = m.viewport.Update(msg)
@@ -385,7 +398,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		default:
 			var cmd tea.Cmd
+			original := m.textarea.Value()
 			m.textarea, cmd = m.textarea.Update(msg)
+			if len(strings.Split(original, "\n")) > len(strings.Split(m.textarea.Value(), "\n")) {
+				if m.textarea.Height()-1 > 3 {
+					m.textarea.SetHeight(m.textarea.Height() - 1)
+				}
+			}
+			if len(strings.Split(original, "\n")) < len(strings.Split(m.textarea.Value(), "\n")) {
+				m.textarea.SetHeight(m.textarea.Height() + 1)
+			}
+			m.syncLayout()
 			// m.adjustTextareaHeight()
 
 			previousBashMode := m.bashMode
@@ -394,6 +417,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, cmd
 		}
+	case tea.MouseWheelMsg:
+		switch msg.Button {
+		case tea.MouseWheelUp:
+			m.viewport.SetYOffset(m.viewport.YOffset() - 2)
+		case tea.MouseWheelDown:
+			m.viewport.SetYOffset(m.viewport.YOffset() + 2)
+		}
+		m.syncLayout()
+	case tea.MouseClickMsg:
+		switch msg.Button {
+		case tea.MouseLeft:
+		case tea.MouseRight:
+		}
+	case tea.MouseReleaseMsg:
+		// msg.Button, msg.
+	case tea.MouseMotionMsg:
 
 	case spinner.TickMsg:
 		if !m.isGenerating {
@@ -463,6 +502,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.queue) > 0 {
 				return m, m.runNextQueuedPrompt()
 			}
+			if len(m.queue) == 0 {
+				m.currentContextSize = client.GetContextSize(m.currentSession.ID)
+				return m, nil
+			}
 
 		}
 		m.refreshMessagesView()
@@ -502,9 +545,18 @@ func (m model) View() tea.View {
 	textareaSectionIndex := len(sections)
 	sections = append(sections, m.textarea.View())
 	if !m.islistCommandsWin {
-		s := strings.ToUpper(m.mode[:1]) + m.mode[1:]
+		// mode and model name
+		s := strings.ToUpper(m.mode[:1]) + m.mode[1:] + " "
 		model_name := m.modelsList[m.modelsListIndex].Model
-		sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.BrightMagenta).Bold(true).Render(s)+" "+lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Bold(false).Render(model_name))
+
+		mode := lipgloss.NewStyle().Foreground(lipgloss.BrightMagenta).Bold(true).Render(s)
+		modelName := lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Bold(false).Render(model_name)
+
+		formatted_context := FormatK(m.currentContextSize) + " (" + strconv.FormatFloat(float64(m.currentContextSize)/1280, 'f', 1, 64) + "%)"
+
+		contextSize := lipgloss.NewStyle().Align(lipgloss.Right).Foreground(lipgloss.BrightMagenta).Width(m.width - len(s) - len(model_name)).Render(formatted_context)
+
+		sections = append(sections, lipgloss.JoinHorizontal(lipgloss.Bottom, mode, modelName, contextSize))
 	}
 
 	if m.isGenerating {
@@ -530,6 +582,7 @@ func (m model) View() tea.View {
 	}
 	v.Cursor = c
 	v.AltScreen = true
+	// v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 
@@ -766,4 +819,7 @@ func (m model) submitQuestionAnswers() (tea.Model, tea.Cmd) {
 	}
 	answer := strings.Join(parts, "\n\n")
 	return m, m.beginGeneration(answer)
+}
+
+func (m model) getMouseSelection() {
 }

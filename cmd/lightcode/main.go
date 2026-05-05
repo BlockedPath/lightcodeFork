@@ -25,18 +25,19 @@ func main() {
 
 	isServer := flag.Bool("server", false, "")
 	isTui := flag.Bool("tui", false, "")
+	isDebug := flag.Bool("debug", false, "")
 
 	flag.Parse()
 	if *isServer {
-		Lightcode(true, false)
+		Lightcode(true, false, *isDebug)
 		return
 	}
 	if *isTui {
-		Lightcode(false, true)
+		Lightcode(false, true, *isDebug)
 		return
 	}
 	if prompt == "" {
-		Lightcode(true, true)
+		Lightcode(true, true, *isDebug)
 		return
 	}
 	// fmt.Println(prompt)
@@ -51,19 +52,19 @@ func isPortInUse(port string) bool {
 	ln.Close()
 	return false
 }
-func Lightcode(isServer bool, isTui bool) {
+func Lightcode(isServer bool, isTui bool, isDebug bool) {
 	port := config.GetCustomization().Port
 	if !isPortInUse(port) {
 		_, err := http.Get("http://localhost:" + port)
 		if err != nil {
 			if isServer && isTui {
 				ready := make(chan struct{})
-				go server.Initialise(ready, port)
+				go server.Initialise(ready, port, isDebug)
 				<-ready
 			}
 			if isServer && !isTui {
 				ready := make(chan struct{})
-				server.Initialise(ready, port)
+				server.Initialise(ready, port, isDebug)
 			}
 		}
 	}
@@ -88,12 +89,13 @@ func runAgent(prompt string) {
 	newMessage := models.Message{SessionID: session_id, Data: models.EncodeMessageData(models.StoredMessageData{Role: "user", Content: prompt})}
 
 	database.Create(&newMessage)
-	for result := range agent.New().Run(ctx, prompt, [][]byte{}, session_id, "chat") {
+	for result := range agent.New().Run(ctx, prompt, [][]byte{}, session_id, "chat", false) {
 		fmt.Println(result.Content)
 		for _, tool := range result.ToolCalls {
 			fmt.Printf("%s({%s})", tool.Name, tool.Arguments)
 		}
 	}
+
 }
 
 func randomSessionID() string {

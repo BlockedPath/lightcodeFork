@@ -7,19 +7,24 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"os"
 	"slices"
 	"strings"
 
 	"github.com/Kartik-2239/lightcode/internal/server/agent"
+	"github.com/Kartik-2239/lightcode/internal/server/config"
 	"github.com/Kartik-2239/lightcode/internal/server/db"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
 )
+
+var DEBUG = false
 
 type Request struct {
 	Images [][]byte `json:"images"`
 }
 
-func Initialise(ready chan<- struct{}, port string) {
+func Initialise(ready chan<- struct{}, port string, isDebug bool) {
+	DEBUG = isDebug
 	http.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "lightcode is running!")
 	})
@@ -31,6 +36,9 @@ func Initialise(ready chan<- struct{}, port string) {
 	http.HandleFunc("POST /delete-session", deleteSession)
 	http.HandleFunc("GET /get-current-todo-list", getCurrentTodoList)
 	http.HandleFunc("GET /get-context-size", getContextSize)
+	http.HandleFunc("GET /get-available-skills", getAvailableSkills)
+	http.HandleFunc("GET /get-current-model", getCurrentModel)
+	http.HandleFunc("GET /get-models", getModels)
 	// http.ListenAndServe(":8080", nil)
 
 	ln, err := net.Listen("tcp", ":"+port)
@@ -117,7 +125,7 @@ func chatcompletion(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
 		return
 	}
-	for result := range agent.New().Run(r.Context(), prompt, req.Images, session_id, mode) {
+	for result := range agent.New().Run(r.Context(), prompt, req.Images, session_id, mode, DEBUG) {
 		if r.Context().Err() != nil {
 			return
 		}
@@ -159,13 +167,54 @@ func getContextSize(w http.ResponseWriter, r *http.Request) {
 	database.Table("messages").Select("*").Where("session_id = ?", session_id).Find(&messages)
 	slices.Reverse(messages)
 	var context_size int64
+	var afterLastAssistant []models.Message
 	for _, m := range messages {
+		afterLastAssistant = append(afterLastAssistant, m)
 		if models.DecodeMessageData(m.Data).Role == "assistant" {
-			context_size = models.DecodeMessageData(m.Data).Usage.PromptTokens
+			context_size = models.DecodeMessageData(m.Data).Usage.PromptTokens + int64(len(models.DecodeMessageData(m.Data).Content)/4)
+
 			break
 		}
 	}
-	json.NewEncoder(w).Encode(context_size)
+	for _, m := range afterLastAssistant {
+		context_size += int64(len(models.DecodeMessageData(m.Data).Content) / 4)
+	}
+	fmt.Fprint(w, context_size)
+}
+
+func getAvailableSkills(w http.ResponseWriter, r *http.Request) {
+	files, err := os.ReadDir(config.SkillsPath())
+	if err != nil {
+		json.NewEncoder(w).Encode([]string{})
+		fmt.Println("gone")
+		return
+	}
+	skills := []string{}
+	for _, f := range files {
+		subFiles, _ := os.ReadDir(config.SkillsPath() + "/" + f.Name())
+		for _, subf := range subFiles {
+			if strings.Contains(subf.Name(), "SKILL.md") {
+				skills = append(skills, f.Name())
+				break
+			}
+		}
+	}
+	json.NewEncoder(w).Encode(skills)
+}
+
+func getCurrentModel(w http.ResponseWriter, r *http.Request) {
+	cur_model := config.GetCustomization().CurrentModel
+	if cur_model.Model != "" {
+		json.NewEncoder(w).Encode(cur_model)
+	}
+}
+
+func getModels(w http.ResponseWriter, r *http.Request) {
+	list_models, err := config.GetModels()
+	if err != nil {
+
+	}
+	json.NewEncoder(w).Encode(list_models)
 }
 
 func randomSessionID() string {

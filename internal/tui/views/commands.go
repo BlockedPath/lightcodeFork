@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/Kartik-2239/lightcode/internal/server/config"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
 	"github.com/Kartik-2239/lightcode/internal/tui/client"
@@ -34,6 +35,8 @@ func CmdHandler(cmd string, m *model) tea.Cmd {
 	case "/usage":
 		appendUsageMessage(m)
 		return nil
+	case "/skills":
+		appendSkillsMessage(m)
 	default:
 		return nil
 	}
@@ -63,7 +66,8 @@ func deleteCurrentSession(m *model) {
 
 func openModelsList(m *model) {
 	m.textarea.Reset()
-	list, err := config.GetModels()
+	// list, err := config.GetModels()
+	list, err := client.GetModels()
 	if err != nil {
 		list = []config.ResModel{}
 	}
@@ -80,6 +84,17 @@ func appendUsageMessage(m *model) {
 	m.messages = append(m.messages, models.Message{
 		SessionID: m.currentSession.ID,
 		Data:      models.EncodeMessageData(models.StoredMessageData{Role: "assistant", Content: usageContent}),
+	})
+	m.viewport.SetContent(renderMessages(m.messages, m.width))
+	m.viewport.GotoBottom()
+	m.syncLayout()
+}
+func appendSkillsMessage(m *model) {
+	available_skills := client.GetAvailableSkills(m.currentSession.ID)
+	formatted_skills_list := lipgloss.NewStyle().Render("Available Skills: \n" + strings.Join(available_skills, ", "))
+	m.messages = append(m.messages, models.Message{
+		SessionID: m.currentSession.ID,
+		Data:      models.EncodeMessageData(models.StoredMessageData{Role: "assistant", Content: formatted_skills_list}),
 	})
 	m.viewport.SetContent(renderMessages(m.messages, m.width))
 	m.viewport.GotoBottom()

@@ -6,7 +6,7 @@ var (
 	styleDot        = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true)
 	styleToolName   = lipgloss.NewStyle().Bold(true)
 	styleTree       = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
-	styleUser       = lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Bold(true).Background(lipgloss.Color("236")).Padding(0, 1)
+	styleUser       = lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Bold(true).Background(lipgloss.Color("236")).Margin(1, 0).AlignVertical(lipgloss.Center)
 	styleThink      = lipgloss.NewStyle().Foreground(lipgloss.BrightBlack).Bold(false)
 	styleResultText = lipgloss.NewStyle().Foreground(lipgloss.Color("7"))
 	styleAdded      = lipgloss.NewStyle().

@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/Kartik-2239/lightcode/internal/server/config"
@@ -146,8 +148,9 @@ func DeleteSession(session_id string) {
 		return
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	fmt.Println(string(body))
+	io.ReadAll(resp.Body)
+	//body, _ := io.ReadAll(resp.Body)
+	// fmt.Println(string(body))
 }
 
 func GetCurrentTodoList(session_id string) []models.ToDo {
@@ -161,4 +164,74 @@ func GetCurrentTodoList(session_id string) []models.ToDo {
 	var todoList []models.ToDo
 	json.Unmarshal(body, &todoList)
 	return todoList
+}
+
+func GetAvailableSkills(session_id string) []string {
+	resp, err := http.Get(baseUrl + "/get-available-skills?session_id=" + url.QueryEscape(session_id))
+	if err != nil {
+		fmt.Println(err.Error())
+		return []string{}
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	var skillsList []string
+	json.Unmarshal(body, &skillsList)
+	return skillsList
+}
+
+func GetContextSize(session_id string) int64 {
+	resp, err := http.Get(baseUrl + "/get-context-size?session_id=" + url.QueryEscape(session_id))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	contextSize, err := strconv.ParseInt(string(body), 10, 64)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return contextSize
+}
+func GetModels() ([]config.ResModel, error) {
+	resp, err := http.Get(baseUrl + "/get-models")
+	if err != nil {
+		log.Fatal(err)
+		return []config.ResModel{}, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+		return []config.ResModel{}, err
+	}
+	var modelsList []config.ResModel
+	err = json.Unmarshal(body, &modelsList)
+	if err != nil {
+		log.Fatal(err)
+		return []config.ResModel{}, err
+	}
+	return modelsList, nil
+}
+func GetCurrentModel() (config.ResModel, error) {
+	resp, err := http.Get(baseUrl + "/get-current-model")
+	if err != nil {
+		log.Fatal(err)
+		return config.ResModel{}, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+		return config.ResModel{}, err
+	}
+	var cur_model config.ResModel
+	err = json.Unmarshal(body, &cur_model)
+	if err != nil {
+		log.Fatal(err)
+		return config.ResModel{}, err
+	}
+	return cur_model, nil
 }

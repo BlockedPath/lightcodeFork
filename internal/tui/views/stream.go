@@ -61,6 +61,11 @@ func (m *model) beginGeneration(prompt string) tea.Cmd {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	ch := client.ChatCompletion(ctx, m.currentSession.ID, textareaValue, m.mode, img_bytes)
+
+	m.imgPasteCounter = 0
+	m.pasteCounter = 0
+	m.queue = []queue{}
+
 	m.cancelStream = cancel
 	m.streamCh = ch
 	m.textarea.SetValue("")
