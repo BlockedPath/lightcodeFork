@@ -28,7 +28,6 @@ func main() {
 	isTui := flag.Bool("tui", false, "")
 	isDebug := flag.Bool("debug", false, "")
 	isVersion := flag.Bool("version", false, "")
-	isVersion = flag.Bool("v", false, "")
 
 	flag.Parse()
 
