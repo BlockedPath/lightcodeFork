@@ -1,5 +1,4 @@
 module github.com/Kartik-2239/lightcode
-
 go 1.25.8
 
 require (
