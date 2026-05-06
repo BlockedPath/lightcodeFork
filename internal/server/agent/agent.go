@@ -152,8 +152,12 @@ func (a *Agent) Run(ctx context.Context, prompt string, b64_imgs [][]byte, sessi
 				slices.Reverse(chats)
 			}
 			var resp llm.Response
-			if i == 0 && len(b64_imgs) >= 0 && len(chats) > 2 {
-				resp, err = llm.ApiCall(ctx, prompt, chats[:len(chats)-2], mode, b64_imgs)
+			if len(b64_imgs) >= 0 {
+				if len(chats) <= 1 {
+					resp, err = llm.ApiCall(ctx, prompt, []llm.Chat{}, mode, b64_imgs)
+				} else {
+					resp, err = llm.ApiCall(ctx, prompt, chats[:len(chats)-1], mode, b64_imgs)
+				}
 			} else {
 				resp, err = llm.ApiCall(ctx, "", chats, mode, [][]byte{})
 			}
