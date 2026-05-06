@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	_ "image/jpeg"
+	_ "image/png"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -42,6 +45,12 @@ type queue struct {
 	imgs   [][]byte
 }
 
+type kittyPreview struct {
+	id   int
+	cols int
+	rows int
+}
+
 type model struct {
 	viewport           viewport.Model
 	islistSessionWin   bool
@@ -56,6 +65,7 @@ type model struct {
 	pastedTexts        map[int]string
 	imgPasteCounter    int
 	pastedImgs         map[int][]byte
+	pastedImgPreviews  map[int]kittyPreview
 	senderStyle        lipgloss.Style
 	err                error
 	cache              map[int]string
@@ -175,6 +185,7 @@ func initialModel() model {
 		modelsListIndex:    currentModelIndex,
 		imgPasteCounter:    0,
 		pastedImgs:         make(map[int][]byte),
+		pastedImgPreviews:  make(map[int]kittyPreview),
 		currentContextSize: 0,
 	}
 	m.syncLayout()
@@ -201,6 +212,9 @@ func (m *model) syncLayout() {
 	}
 	if m.islistCommandsWin {
 		reservedHeight += m.listCommands.Height()
+	}
+	if previews, ok := m.currentKittyPreview(); ok {
+		reservedHeight += previews[0].rows
 	}
 	if m.bashMode {
 		reservedHeight++
@@ -328,9 +342,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			textBytes := clipboard.Read(clipboard.FmtText)
 			imgBytes := clipboard.Read(clipboard.FmtImage)
 			nextVal := curVal
+			var cmd tea.Cmd
 			if imgBytes != nil {
 				m.imgPasteCounter++
 				m.pastedImgs[m.imgPasteCounter] = imgBytes
+				preview, upload := buildKittyPreviewUpload(imgBytes, m.imgPasteCounter, m.width, 10, os.Getenv("TMUX") != "")
+				if preview.id > 0 && upload != "" {
+					m.pastedImgPreviews[m.imgPasteCounter] = preview
+					cmd = tea.Raw(upload)
+				}
 				placeholder := fmt.Sprintf("[pasted img #%d]", m.imgPasteCounter)
 				nextVal = strings.TrimSpace(nextVal + " " + placeholder)
 			}
@@ -345,7 +365,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.textarea.SetValue(nextVal + pasteValue)
 			}
-			return m, nil
+			m.syncLayout()
+			return m, cmd
 		// case "shift+enter":
 		// 	curVal := m.textarea.Value()
 		// 	m.textarea.SetValue(curVal + "\n")
@@ -364,7 +385,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.syncLayout()
 				return m, nil
 			}
-			return m, m.beginGeneration(m.textarea.Value())
+			val := m.textarea.Value()
+			m.textarea.SetValue("")
+			m.syncLayout()
+			return m, m.beginGeneration(val)
 		case "shift+enter":
 			m.textarea.SetValue(m.textarea.Value() + "\n")
 			if len(strings.Split(m.textarea.Value(), "\n")) > m.textarea.Height() {
@@ -542,6 +566,18 @@ func (m model) View() tea.View {
 		sections = append(sections, m.renderQueueList())
 	}
 
+	if previews, ok := m.currentKittyPreview(); ok {
+		images := []string{}
+		slices.Reverse(previews)
+		for _, preview := range previews {
+			if placeholders := renderKittyPlaceholders(preview.id, preview.cols, preview.rows); placeholders != "" {
+				images = append(images, placeholders)
+			}
+		}
+		sections = append(sections, lipgloss.JoinHorizontal(lipgloss.Left, images...))
+
+	}
+
 	textareaSectionIndex := len(sections)
 	sections = append(sections, m.textarea.View())
 	if !m.islistCommandsWin {
@@ -614,7 +650,7 @@ func createPrompt(value string, m *model) (string, [][]byte) {
 		}
 		if img, ok := m.pastedImgs[idx]; ok {
 			imgBytes = append(imgBytes, img)
-			return ""
+			return fmt.Sprintf("[pasted img #%d]", idx)
 		}
 		return match
 	})
@@ -822,4 +858,34 @@ func (m model) submitQuestionAnswers() (tea.Model, tea.Cmd) {
 }
 
 func (m model) getMouseSelection() {
+}
+
+func (m model) currentKittyPreview() ([]kittyPreview, bool) {
+	re := regexp.MustCompile(`\[pasted img #(\d+)\]`)
+	matches := re.FindAllStringSubmatch(m.textarea.Value(), -1)
+	previews := make([]kittyPreview, 0, len(matches))
+	for i := len(matches) - 1; i >= 0; i-- {
+		idx, err := strconv.Atoi(matches[i][1])
+		if err != nil {
+			continue
+		}
+		preview, ok := m.pastedImgPreviews[idx]
+		if ok && preview.id > 0 && preview.cols > 0 && preview.rows > 0 {
+			// preview = append(previews, preview)
+			previews = append(previews, preview)
+			// return preview, true
+		}
+	}
+	if len(previews) > 0 {
+		return previews, true
+	}
+	return []kittyPreview{}, false
+}
+
+func (m *model) clearPastedInput() {
+	m.pasteCounter = 0
+	m.pastedTexts = make(map[int]string)
+	m.imgPasteCounter = 0
+	m.pastedImgs = make(map[int][]byte)
+	m.pastedImgPreviews = make(map[int]kittyPreview)
 }

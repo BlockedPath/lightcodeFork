@@ -55,6 +55,8 @@ func (m *model) beginGeneration(prompt string) tea.Cmd {
 	m.syncLayout()
 
 	textareaValue, img_bytes := createPrompt(strings.Trim(prompt, "\n"), m)
+	m.clearPastedInput()
+	m.syncLayout()
 	newMessage := client.SendMessage(m.currentSession.ID, textareaValue, img_bytes)
 	m.messages = append(m.messages, newMessage)
 	m.refreshMessagesView()
@@ -62,8 +64,6 @@ func (m *model) beginGeneration(prompt string) tea.Cmd {
 	ctx, cancel := context.WithCancel(context.Background())
 	ch := client.ChatCompletion(ctx, m.currentSession.ID, textareaValue, m.mode, img_bytes)
 
-	m.imgPasteCounter = 0
-	m.pasteCounter = 0
 	m.queue = []queue{}
 
 	m.cancelStream = cancel

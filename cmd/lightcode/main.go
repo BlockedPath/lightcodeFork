@@ -28,6 +28,7 @@ func main() {
 	isDebug := flag.Bool("debug", false, "")
 
 	flag.Parse()
+
 	if *isServer {
 		Lightcode(true, false, *isDebug)
 		return
