@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	"github.com/Kartik-2239/lightcode/internal/server"
@@ -26,9 +27,20 @@ func main() {
 	isServer := flag.Bool("server", false, "")
 	isTui := flag.Bool("tui", false, "")
 	isDebug := flag.Bool("debug", false, "")
+	isVersion := flag.Bool("version", false, "")
+	isVersion = flag.Bool("v", false, "")
 
 	flag.Parse()
 
+	if *isVersion {
+		info, ok := debug.ReadBuildInfo()
+		if !ok || info.Main.Version == "" {
+			fmt.Println("dev")
+			return
+		}
+		fmt.Println("version ", info.Main.Version)
+		return
+	}
 	if *isServer {
 		Lightcode(true, false, *isDebug)
 		return
