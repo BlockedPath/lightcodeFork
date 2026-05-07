@@ -15,9 +15,11 @@ import (
 	"github.com/Kartik-2239/lightcode/internal/server/config"
 	"github.com/Kartik-2239/lightcode/internal/server/db"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
+	"gorm.io/gorm"
 )
 
 var DEBUG = false
+var DB *gorm.DB
 
 type Request struct {
 	Images [][]byte `json:"images"`
@@ -25,6 +27,12 @@ type Request struct {
 
 func Initialise(ready chan<- struct{}, port string, isDebug bool) {
 	DEBUG = isDebug
+	database, err := db.Connect()
+	if err != nil {
+		fmt.Println("Database error")
+		return
+	}
+	DB = database
 	http.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "lightcode is running!")
 	})
@@ -56,24 +64,21 @@ func Initialise(ready chan<- struct{}, port string, isDebug bool) {
 }
 
 func listSessions(w http.ResponseWriter, r *http.Request) {
-	database, _ := db.Connect()
 	var sessions []models.Session
-	database.Table("sessions").Select("*").Find(&sessions)
+	DB.Table("sessions").Select("*").Find(&sessions)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(sessions)
 }
 
 func getSessionData(w http.ResponseWriter, r *http.Request) {
-	database, _ := db.Connect()
 	var messages []models.Message
 	session_id := r.URL.Query().Get("session_id")
-	database.Table("messages").Select("*").Where("session_id = ?", session_id).Find(&messages)
+	DB.Table("messages").Select("*").Where("session_id = ?", session_id).Find(&messages)
 	// fmt.Println(messages)
 	json.NewEncoder(w).Encode(messages)
 }
 
 func sendMessage(w http.ResponseWriter, r *http.Request) {
-	database, _ := db.Connect()
 	session_id := r.URL.Query().Get("session_id")
 	message := r.URL.Query().Get("message")
 
@@ -83,27 +88,25 @@ func sendMessage(w http.ResponseWriter, r *http.Request) {
 
 	}
 	var messages []models.Message
-	database.Table("messages").Select("*").Where("session_id = ?", session_id).Find(&messages)
+	DB.Table("messages").Select("*").Where("session_id = ?", session_id).Find(&messages)
 	newMessage := models.Message{SessionID: session_id, Data: models.EncodeMessageData(models.StoredMessageData{Role: "user", Content: message})}
-	database.Create(&newMessage)
+	DB.Create(&newMessage)
 	json.NewEncoder(w).Encode(newMessage)
 }
 
 func deleteSession(w http.ResponseWriter, r *http.Request) {
 	session_id := r.URL.Query().Get("session_id")
-	database, _ := db.Connect()
-	database.Table("messages").Where("session_id = ?", session_id).Delete(&models.Message{})
-	database.Table("sessions").Where("id = ?", session_id).Delete(&models.Session{})
+	DB.Table("messages").Where("session_id = ?", session_id).Delete(&models.Message{})
+	DB.Table("sessions").Where("id = ?", session_id).Delete(&models.Session{})
 	fmt.Fprint(w, "Session deleted successfully")
 }
 
 func createSession(w http.ResponseWriter, r *http.Request) {
 	prompt := r.URL.Query().Get("prompt")
 	workingDirectory := r.URL.Query().Get("working_directory")
-	database, _ := db.Connect()
 	session_id := randomSessionID()
 	session := models.Session{ID: session_id, Title: prompt, Directory: workingDirectory}
-	database.Create(&session)
+	DB.Create(&session)
 	fmt.Fprint(w, session_id)
 }
 
@@ -125,7 +128,7 @@ func chatcompletion(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
 		return
 	}
-	for result := range agent.New().Run(r.Context(), prompt, req.Images, session_id, mode, DEBUG) {
+	for result := range agent.New(DB).Run(r.Context(), prompt, req.Images, session_id, mode, DEBUG) {
 		if r.Context().Err() != nil {
 			return
 		}
@@ -142,13 +145,13 @@ func getCurrentTodoList(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"session_id required"}`, http.StatusBadRequest)
 		return
 	}
-	database, err := db.Connect()
-	if err != nil {
-		http.Error(w, `{"error":"database unavailable"}`, http.StatusInternalServerError)
-		return
-	}
+	// database, err := db.Connect()
+	// if err != nil {
+	// 	http.Error(w, `{"error":"database unavailable"}`, http.StatusInternalServerError)
+	// 	return
+	// }
 	var session models.Session
-	if err := database.Where("id = ?", sessionID).First(&session).Error; err != nil {
+	if err := DB.Where("id = ?", sessionID).First(&session).Error; err != nil {
 		http.Error(w, `{"error":"session not found"}`, http.StatusNotFound)
 		return
 	}
@@ -161,10 +164,10 @@ func getCurrentTodoList(w http.ResponseWriter, r *http.Request) {
 }
 
 func getContextSize(w http.ResponseWriter, r *http.Request) {
-	database, _ := db.Connect()
+	// database, _ := db.Connect()
 	var messages []models.Message
 	session_id := r.URL.Query().Get("session_id")
-	database.Table("messages").Select("*").Where("session_id = ?", session_id).Find(&messages)
+	DB.Table("messages").Select("*").Where("session_id = ?", session_id).Find(&messages)
 	slices.Reverse(messages)
 	var context_size int64
 	var afterLastAssistant []models.Message

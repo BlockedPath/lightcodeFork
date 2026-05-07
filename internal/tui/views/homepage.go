@@ -235,8 +235,10 @@ func (m *model) syncLayout() {
 	if m.isModelsListWin {
 		reservedHeight += m.modelsListHeight()
 	}
-	// for texarea border
+	// for textarea border
 	reservedHeight += 2
+	// for dir above textarea
+	reservedHeight += 1
 
 	viewportHeight := m.height - reservedHeight
 	if viewportHeight < 1 {
@@ -611,6 +613,9 @@ func (m model) View() tea.View {
 		sections = append(sections, lipgloss.JoinHorizontal(lipgloss.Left, images...))
 
 	}
+
+	sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.BrightCyan).Render(shortenDir(m.currentSession.Directory)))
+
 	sections = append(sections, lipgloss.NewStyle().Render(strings.Repeat("—", m.width)))
 	textareaSectionIndex := len(sections)
 	sections = append(sections, m.textarea.View())

@@ -108,7 +108,7 @@ func runAgent(prompt string) {
 	newMessage := models.Message{SessionID: session_id, Data: models.EncodeMessageData(models.StoredMessageData{Role: "user", Content: prompt})}
 
 	database.Create(&newMessage)
-	for result := range agent.New().Run(ctx, prompt, [][]byte{}, session_id, "chat", false) {
+	for result := range agent.New(database).Run(ctx, prompt, [][]byte{}, session_id, "chat", false) {
 		fmt.Println(result.Content)
 		for _, tool := range result.ToolCalls {
 			fmt.Printf("%s({%s})", tool.Name, tool.Arguments)

@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/Kartik-2239/lightcode/internal/server/db"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
 	"github.com/Kartik-2239/lightcode/internal/server/llm"
 	"gorm.io/gorm"
@@ -18,21 +17,23 @@ const MaxIterations = 25
 // const DEBUG = false
 const CONTEXT_WINDOW int64 = 128_000
 
-type Agent struct{}
+type Agent struct {
+	db *gorm.DB
+}
 
-func New() *Agent {
-	return &Agent{}
+func New(db *gorm.DB) *Agent {
+	return &Agent{db}
 }
 
 func (a *Agent) Run(ctx context.Context, prompt string, b64_imgs [][]byte, session_id string, mode string, DEBUG bool) <-chan models.StoredMessageData {
 	ch := make(chan models.StoredMessageData)
 	// currentPrompt := prompt
-	database, err := db.Connect()
-	if err != nil {
-		ch <- models.StoredMessageData{Role: "error", Content: "Ran into error: " + err.Error()}
-		close(ch)
-		return ch
-	}
+	database := a.db
+	// if err != nil {
+	// 	ch <- models.StoredMessageData{Role: "error", Content: "Ran into error: " + err.Error()}
+	// 	close(ch)
+	// 	return ch
+	// }
 	var session models.Session
 	result := database.Where("id = ?", session_id).First(&session)
 	if result.Error != nil {
@@ -62,7 +63,7 @@ func (a *Agent) Run(ctx context.Context, prompt string, b64_imgs [][]byte, sessi
 			}
 			var messages []models.Message
 			database.Where("session_id = ?", session_id).Find(&messages)
-			chats := make([]llm.Chat, 0, len(messages)+2) // +2 for agents.md and todo list
+			chats := make([]llm.Chat, 0, len(messages)+2)
 
 			// before starting the agent check if the token usage till the last memory compaction.
 			/*
@@ -116,6 +117,7 @@ func (a *Agent) Run(ctx context.Context, prompt string, b64_imgs [][]byte, sessi
 				}
 			}
 			token_count = predictTokenCount(messages[len(messages)-len(chats):], len(chats)-1)
+
 			if DEBUG {
 				fmt.Println("token_count", token_count)
 			}

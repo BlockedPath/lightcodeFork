@@ -2,7 +2,6 @@ package views
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -107,12 +106,11 @@ func appendSkillsMessage(m *model) {
 	m.syncLayout()
 }
 func appendDirMessage(m *model) {
-	home, _ := os.UserHomeDir()
 	var dir string
 	if m.currentSession.Directory == "" {
 		dir = "start a session"
 	} else {
-		dir = strings.Replace(m.currentSession.Directory, home, "~", 1)
+		dir = shortenDir(m.currentSession.Directory)
 	}
 	m.messages = append(m.messages, models.Message{
 		SessionID: m.currentSession.ID,
