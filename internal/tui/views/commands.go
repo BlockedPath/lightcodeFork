@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -37,8 +38,13 @@ func CmdHandler(cmd string, m *model) tea.Cmd {
 		return nil
 	case "/skills":
 		appendSkillsMessage(m)
+	case "/dir":
+		appendDirMessage(m)
 	default:
 		return nil
+	}
+	if m.isGenerating {
+		return waitForMessages(m.streamCh)
 	}
 	return nil
 }
@@ -95,6 +101,22 @@ func appendSkillsMessage(m *model) {
 	m.messages = append(m.messages, models.Message{
 		SessionID: m.currentSession.ID,
 		Data:      models.EncodeMessageData(models.StoredMessageData{Role: "assistant", Content: formatted_skills_list}),
+	})
+	m.viewport.SetContent(renderMessages(m.messages, m.width))
+	m.viewport.GotoBottom()
+	m.syncLayout()
+}
+func appendDirMessage(m *model) {
+	home, _ := os.UserHomeDir()
+	var dir string
+	if m.currentSession.Directory == "" {
+		dir = "start a session"
+	} else {
+		dir = strings.Replace(m.currentSession.Directory, home, "~", 1)
+	}
+	m.messages = append(m.messages, models.Message{
+		SessionID: m.currentSession.ID,
+		Data:      models.EncodeMessageData(models.StoredMessageData{Role: "assistant", Content: dir}),
 	})
 	m.viewport.SetContent(renderMessages(m.messages, m.width))
 	m.viewport.GotoBottom()

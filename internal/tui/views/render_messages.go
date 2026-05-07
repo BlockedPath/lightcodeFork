@@ -102,22 +102,34 @@ func formatToolResult(content string, codeChanges []string, width int, tc models
 
 	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Red).Render(fmt.Sprintf("-%d", len(oldlines))) + " " + lipgloss.NewStyle().Foreground(lipgloss.Green).Render(fmt.Sprintf("+%d", len(newlines))) + "\n")
 
-	if len(newlines) > 4 {
-		newlines = newlines[:4]
-		newlines = append(newlines, "...")
+	if tc.Name == "write_file" {
+		line_limit := 20
+		if len(newlines) > line_limit {
+			newlines = newlines[:line_limit]
+			newlines = append(newlines, fmt.Sprintf("...\n%d more lines", len(newlines)))
+		}
+		if len(oldlines) > line_limit {
+			oldlines = oldlines[:line_limit]
+			oldlines = append(oldlines, fmt.Sprintf("...\n%d more lines", len(oldlines)))
+		}
 	}
-	if len(oldlines) > 4 {
-		oldlines = oldlines[:4]
 
-		oldlines = append(oldlines, "...")
-	}
-	for _, line := range oldlines {
-		sb.WriteString(styleRemoved.Width(width).Render("- " + line))
+	for i, line := range oldlines {
+		if i == len(oldlines)-1 {
+			sb.WriteString(styleRemoved.Foreground(lipgloss.BrightBlack).Width(width).Render("- " + line))
+		} else {
+			sb.WriteString(styleRemoved.Width(width).Render("- " + line))
+		}
 		sb.WriteString("\n")
 	}
-	for _, line := range newlines {
-		sb.WriteString(styleAdded.Width(width).Render("+ " + line))
+	for i, line := range newlines {
+		if i == len(newlines) {
+			sb.WriteString(styleAdded.Foreground(lipgloss.BrightBlack).Width(width).Render("+ " + line))
+		} else {
+			sb.WriteString(styleAdded.Width(width).Render("+ " + line))
+		}
 		sb.WriteString("\n")
+
 	}
 	return sb.String()
 }
@@ -302,8 +314,9 @@ func renderMessages(msgs []models.Message, width int) string {
 					if !strings.HasPrefix(content, "<memory>") && !strings.HasSuffix(content, "</memory>") {
 						if len(content) > width {
 
-							rest := styleThink.Width(width).UnsetMaxWidth().Render(strings.ReplaceAll(content, "\n", "\n  "))
-							lines = append(lines, dot+" "+rest)
+							// rest := styleThink.Width(width).UnsetMaxWidth().Render(strings.ReplaceAll(content, "\n", "\n  "))
+							// lines = append(lines, dot+" "+rest)
+							lines = append(lines, dot+" "+styleThink.Width(width).Render(content))
 						} else {
 							lines = append(lines, dot+" "+styleThink.Width(width).Render(content))
 						}

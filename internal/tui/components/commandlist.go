@@ -21,11 +21,11 @@ type styles struct {
 
 func newStyles(darkBG bool) styles {
 	var s styles
-	s.title = lipgloss.NewStyle().MarginLeft(2)
-	s.item = lipgloss.NewStyle().PaddingLeft(4)
-	s.selectedItem = lipgloss.NewStyle().PaddingLeft(2).Foreground(lipgloss.White)
-	s.pagination = list.DefaultStyles(darkBG).PaginationStyle.PaddingLeft(4)
-	s.help = list.DefaultStyles(darkBG).HelpStyle.PaddingLeft(4).PaddingBottom(1)
+	s.title = lipgloss.NewStyle().MarginLeft(0)
+	s.item = lipgloss.NewStyle().PaddingLeft(2)
+	s.selectedItem = lipgloss.NewStyle().PaddingLeft(0).Foreground(lipgloss.White)
+	s.pagination = list.DefaultStyles(darkBG).PaginationStyle.PaddingLeft(1)
+	s.help = list.DefaultStyles(darkBG).HelpStyle.PaddingLeft(1).PaddingBottom(1)
 	s.quitText = lipgloss.NewStyle().Margin(1, 0, 2, 4)
 	return s
 }
@@ -47,12 +47,12 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		return
 	}
 
-	str := fmt.Sprintf("%d. %s", index+1, i)
+	str := fmt.Sprintf("%s", i)
 
 	fn := d.styles.item.Render
 	if index == m.Index() {
 		fn = func(s ...string) string {
-			return d.styles.selectedItem.Render("> " + strings.Join(s, " "))
+			return d.styles.selectedItem.Render(lipgloss.NewStyle().Foreground(lipgloss.BrightCyan).Render("→ " + strings.Join(s, " ")))
 		}
 	}
 
@@ -74,9 +74,9 @@ func initialModel() ModelCmdList {
 		item("new_session"),
 		item("delete_session"),
 		item("skills"),
-		item("editor"),
 		item("models"),
 		item("usage"),
+		item("dir"),
 	}
 
 	const defaultWidth = 20
@@ -88,6 +88,7 @@ func initialModel() ModelCmdList {
 	l.SetShowPagination(false)
 	l.SetShowTitle(false)
 	l.SetShowFilter(false)
+	l.SetDelegate(list.DefaultDelegate{})
 
 	m := ModelCmdList{list: l, allItems: items}
 	m.updateStyles(true) // default to dark styles.
@@ -133,7 +134,7 @@ func (m ModelCmdList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.list, cmd = m.list.Update(msg)
 			return m, cmd
 			// case "default":
-			// 	return m, nil
+			// return m, nil
 		}
 	}
 	return m, nil
@@ -148,7 +149,15 @@ func (m ModelCmdList) StringView() string {
 }
 
 func (m ModelCmdList) Current() string {
-	return string(m.list.SelectedItem().(item))
+	selected := m.list.SelectedItem()
+	if selected == nil {
+		return ""
+	}
+	it, ok := selected.(item)
+	if !ok {
+		return ""
+	}
+	return string(it)
 }
 
 func (m ModelCmdList) Height() int {

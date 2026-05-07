@@ -101,14 +101,24 @@ func initialModel() model {
 	ta.SetVirtualCursor(false)
 	ta.Focus()
 
-	ta.Prompt = "┃ "
+	ta.SetPromptFunc(1, func(pi textarea.PromptInfo) string {
+		if pi.LineNumber == 0 {
+			return "❯ "
+		}
+		return " "
+	})
 
 	ta.CharLimit = 32000
 
 	s := ta.Styles()
 	s.Focused.CursorLine = lipgloss.NewStyle()
 
-	s.Focused.Base = lipgloss.NewStyle()
+	// s.Focused.Base = s.Focused.Base.
+	// 	Border(lipgloss.NormalBorder()).
+	// 	BorderTop(true).
+	// 	BorderBottom(true).
+	// 	BorderRight(false).
+	// 	BorderLeft(false)
 
 	width, height := 80, 24
 	if w, h, err := term.GetSize(os.Stdout.Fd()); err == nil {
@@ -116,7 +126,7 @@ func initialModel() model {
 	}
 
 	ta.SetWidth(width)
-	ta.SetHeight(4)
+	ta.SetHeight(1)
 	ta.SetStyles(s)
 
 	ta.ShowLineNumbers = false
@@ -225,6 +235,8 @@ func (m *model) syncLayout() {
 	if m.isModelsListWin {
 		reservedHeight += m.modelsListHeight()
 	}
+	// for texarea border
+	reservedHeight += 2
 
 	viewportHeight := m.height - reservedHeight
 	if viewportHeight < 1 {
@@ -234,71 +246,6 @@ func (m *model) syncLayout() {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if m.islistSessionWin {
-		var cmd tea.Cmd
-		updatedModel, cmd := m.listSession.Update(msg)
-		m.listSession = updatedModel.(components.Model)
-		switch msg := msg.(type) {
-		case tea.KeyPressMsg:
-			switch msg.String() {
-			case "enter":
-				cur_idx := m.listSession.Current()
-				m.currentSession = m.sessions[cur_idx]
-				m.messages = client.GetSessionData(m.currentSession.ID)
-				m.todoList = client.GetCurrentTodoList(m.currentSession.ID)
-				m.islistSessionWin = false
-				m.currentContextSize = client.GetContextSize(m.currentSession.ID)
-				m.syncLayout()
-				m.viewport.SetContent(renderMessages(m.messages, m.width))
-				m.viewport.GotoBottom()
-			}
-		}
-		return m, cmd
-	}
-	if m.islistCommandsWin {
-		switch msg := msg.(type) {
-		case tea.KeyPressMsg:
-			switch msg.String() {
-			case "esc":
-				m.islistCommandsWin = false
-				m.syncLayout()
-				return m, nil
-			case "up", "down":
-				var cmd tea.Cmd
-				updatedModel, cmd := m.listCommands.Update(msg)
-				m.listCommands = updatedModel.(components.ModelCmdList)
-				return m, cmd
-			case "enter":
-				m.cacheIndex++
-				cur_command := m.listCommands.Current()
-				m.islistCommandsWin = false
-				m.syncLayout()
-				m.listCommands.Filter("")
-				if len(cur_command) > 1 {
-					cmd := CmdHandler("/"+cur_command, &m)
-					m.textarea.SetValue("")
-					return m, cmd
-				}
-				return m, nil
-
-			default:
-				m.cache[m.cacheIndex] = m.textarea.Value()
-				var cmd tea.Cmd
-				m.textarea, cmd = m.textarea.Update(msg)
-				val := m.textarea.Value()
-
-				if !strings.HasPrefix(val, "/") {
-					m.islistCommandsWin = false
-					m.syncLayout()
-				} else {
-					m.listCommands.Filter(strings.TrimPrefix(val, "/"))
-				}
-				return m, cmd
-			}
-		}
-		return m, nil
-	}
-
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -310,6 +257,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.viewport.GotoBottom()
 	case tea.KeyPressMsg:
+		if m.islistSessionWin {
+			updatedModel, cmd := m.listSession.Update(msg)
+			m.listSession = updatedModel.(components.Model)
+			switch msg.String() {
+			case "enter":
+				curIdx := m.listSession.Current()
+				if curIdx < 0 || curIdx >= len(m.sessions) {
+					return m, cmd
+				}
+				m.currentSession = m.sessions[curIdx]
+				m.messages = client.GetSessionData(m.currentSession.ID)
+				m.todoList = client.GetCurrentTodoList(m.currentSession.ID)
+				m.islistSessionWin = false
+				m.currentContextSize = client.GetContextSize(m.currentSession.ID)
+				m.syncLayout()
+				m.viewport.SetContent(renderMessages(m.messages, m.width))
+				m.viewport.GotoBottom()
+			}
+			return m, cmd
+		}
 		if m.questionMode {
 			return m.handleQuestionInput(msg)
 		}
@@ -318,9 +285,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch msg.String() {
 		case "ctrl+c":
-			fmt.Println(m.textarea.Value())
-			return m, tea.Quit
+			if m.islistCommandsWin {
+				m.islistCommandsWin = false
+				m.syncLayout()
+				return m, nil
+			}
+			return m, tea.Sequence(tea.Printf("Resume session with lightcode -r %s", m.currentSession.ID), tea.Quit)
 		case "esc":
+			if m.islistCommandsWin {
+				m.islistCommandsWin = false
+				m.listCommands.Filter("")
+				m.syncLayout()
+				return m, nil
+			}
 			if m.streamCh != nil && m.cancelStream != nil && time.Since(m.lastEsc) < 500*time.Millisecond {
 				m.cancelActiveGeneration()
 				return m, nil
@@ -373,6 +350,32 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// 	m.adjustTextareaHeight()
 		// 	return m, nil
 		case "enter":
+			if m.islistCommandsWin {
+				m.cacheIndex++
+				curCommand := m.listCommands.Current()
+				m.islistCommandsWin = false
+				m.listCommands.Filter("")
+				if curCommand == "" {
+					m.ensureCurrentSession(m.textarea.Value())
+					if m.isGenerating {
+						m.queue = append(m.queue, queue{prompt: m.textarea.Value()})
+						m.textarea.SetValue("")
+						m.syncLayout()
+						return m, nil
+					}
+					val := m.textarea.Value()
+					m.textarea.SetValue("")
+					m.syncLayout()
+					return m, m.beginGeneration(val)
+				}
+				m.syncLayout()
+				if len(curCommand) > 1 {
+					cmd := CmdHandler("/"+curCommand, &m)
+					m.textarea.SetValue("")
+					return m, cmd
+				}
+				return m, nil
+			}
 			if strings.HasPrefix(m.textarea.Value(), "/") {
 				cmd := CmdHandler(m.textarea.Value(), &m)
 				return m, cmd
@@ -397,6 +400,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.syncLayout()
 			return m, nil
 		case "up", "down":
+			if m.islistCommandsWin {
+				var cmd tea.Cmd
+				updatedModel, cmd := m.listCommands.Update(msg)
+				m.listCommands = updatedModel.(components.ModelCmdList)
+				return m, cmd
+			}
 			var cmd tea.Cmd
 			m.viewport, cmd = m.viewport.Update(msg)
 			return m, cmd
@@ -410,22 +419,47 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "/":
+			if m.islistCommandsWin {
+				m.cache[m.cacheIndex] = m.textarea.Value()
+				var cmd tea.Cmd
+				m.textarea, cmd = m.textarea.Update(msg)
+				m.listCommands.Filter(strings.TrimPrefix(m.textarea.Value(), "/"))
+				return m, cmd
+			}
 			var cmd tea.Cmd
 			m.textarea, cmd = m.textarea.Update(msg)
 			wasListCommandsOpen := m.islistCommandsWin
 			if len(m.textarea.Value()) == 1 {
+				m.listCommands.Filter("")
 				m.islistCommandsWin = true
 			}
+			// if m.isGenerating {
+			// 	return m, tea.Batch(cmd, waitForMessages(m.streamCh))
+			// }
 			if !wasListCommandsOpen && m.islistCommandsWin {
 				m.syncLayout()
 			}
 			return m, cmd
 		default:
+			if m.islistCommandsWin {
+				m.cache[m.cacheIndex] = m.textarea.Value()
+				var cmd tea.Cmd
+				m.textarea, cmd = m.textarea.Update(msg)
+				val := m.textarea.Value()
+				if !strings.HasPrefix(val, "/") {
+					m.islistCommandsWin = false
+					m.listCommands.Filter("")
+					m.syncLayout()
+				} else {
+					m.listCommands.Filter(strings.TrimPrefix(val, "/"))
+				}
+				return m, cmd
+			}
 			var cmd tea.Cmd
 			original := m.textarea.Value()
 			m.textarea, cmd = m.textarea.Update(msg)
 			if len(strings.Split(original, "\n")) > len(strings.Split(m.textarea.Value(), "\n")) {
-				if m.textarea.Height()-1 > 3 {
+				if m.textarea.Height()-1 >= 1 {
 					m.textarea.SetHeight(m.textarea.Height() - 1)
 				}
 			}
@@ -577,9 +611,11 @@ func (m model) View() tea.View {
 		sections = append(sections, lipgloss.JoinHorizontal(lipgloss.Left, images...))
 
 	}
-
+	sections = append(sections, lipgloss.NewStyle().Render(strings.Repeat("—", m.width)))
 	textareaSectionIndex := len(sections)
 	sections = append(sections, m.textarea.View())
+	sections = append(sections, lipgloss.NewStyle().Render(strings.Repeat("—", m.width)))
+
 	if !m.islistCommandsWin {
 		// mode and model name
 		s := strings.ToUpper(m.mode[:1]) + m.mode[1:] + " "

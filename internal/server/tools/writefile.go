@@ -38,7 +38,7 @@ func WriteFile(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 }
 
 func init() {
-	Prompt := `"Write content to a file, creating it if it doesn't exist", Do not guess paths before writing a new file`
+	Prompt := `"Write content to a file, creating it if it doesn't exist", Do not guess paths before writing a new file. *Use edit tool if the file already exists and the code change isn't too big*`
 	Register("write_file", ToolDef{
 		Name:        "write_file",
 		Description: Prompt,

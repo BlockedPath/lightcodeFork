@@ -2,6 +2,7 @@ package views
 
 import (
 	"context"
+	"os"
 	"strings"
 	"time"
 
@@ -42,8 +43,10 @@ func (m *model) ensureCurrentSession(prompt string) {
 	if m.currentSession.ID != "" {
 		return
 	}
+	dir, _ := os.Getwd()
+	home, _ := os.UserHomeDir()
 	sessionID := client.CreateSession(prompt)
-	m.currentSession = models.Session{ID: sessionID, Title: prompt, Directory: "."}
+	m.currentSession = models.Session{ID: sessionID, Title: prompt, Directory: strings.Replace(dir, home, "~", 1)}
 	client.Reverse(m.sessions)
 	m.sessions = append(m.sessions, m.currentSession)
 	client.Reverse(m.sessions)

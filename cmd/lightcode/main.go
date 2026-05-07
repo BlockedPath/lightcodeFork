@@ -24,6 +24,10 @@ func main() {
 	flag.StringVar(&prompt, "prompt", "", "prompt for the agent")
 	flag.StringVar(&prompt, "p", "", "prompt for the agent (shorthand)")
 
+	var resume string
+	flag.StringVar(&resume, "resume", "", "resume a session")
+	flag.StringVar(&resume, "r", "", "resume a session")
+
 	isServer := flag.Bool("server", false, "")
 	isTui := flag.Bool("tui", false, "")
 	isDebug := flag.Bool("debug", false, "")
@@ -39,6 +43,9 @@ func main() {
 		}
 		fmt.Println("version ", info.Main.Version)
 		return
+	}
+	if resume == "" {
+
 	}
 	if *isServer {
 		Lightcode(true, false, *isDebug)

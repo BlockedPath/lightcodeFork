@@ -59,15 +59,15 @@ func Edit(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	if err != nil {
 		return ToolResponse{Content: "Error: " + err.Error()}, err
 	}
-
+	// new_old, new_new := string_differentiator(oldString, copyNewString)
 	return ToolResponse{Content: strings.Join([]string{"file_path: " + path, "old_string: ", oldString, "========", "new_string: ", copyNewString}, "\n"), CodeChanges: []string{"---" + oldString, "+++" + copyNewString}}, nil
 }
 
 func init() {
 	Prompt := `Perform exact string replacements in existing files
-- Read the file before using edit tool and provide the exact old string and filepath
-- DO NOT GUESS THE OLD STRING AND FILE PATH
-`
+- Read the file before using edit tool and provide the exact old string and filepath.
+- DO NOT GUESS THE OLD STRING AND FILE PATH.
+- Only use old strings that are changed don't generate TOO many tokens only input code that needs to be changed.`
 	Register("edit", ToolDef{
 		Name:        "edit",
 		Description: Prompt,
@@ -76,7 +76,7 @@ func init() {
 			"properties": map[string]any{
 				"filePath": map[string]any{
 					"type":        "string",
-					"description": "The path to the file to edit",
+					"description": "The path to the file to edit in string",
 				},
 				"oldString": map[string]any{
 					"type":        "string",
@@ -94,4 +94,39 @@ func init() {
 			"required": []string{"filePath", "oldString", "newString", "replaceAll"},
 		},
 	}, Edit)
+}
+
+func string_differentiator(old_string string, new_string string) (string, string) { // old, new
+	old_lines := strings.Split(old_string, "\n")
+	new_lines := strings.Split(new_string, "\n")
+
+	old_lines_reverse := reverseSlice(old_lines)
+	new_lines_reverse := reverseSlice(new_lines)
+
+	minLength := min(len(old_lines), len(new_lines))
+
+	var starting_idx int
+	var ending_idx int
+
+	for i := range minLength {
+		if old_lines[i] != new_lines[i] {
+			starting_idx = i
+		}
+	}
+	for i := range minLength {
+		if old_lines_reverse[i] != new_lines_reverse[i] {
+			ending_idx = i
+		}
+	}
+	return strings.Join(old_lines[starting_idx:ending_idx], "\n"), strings.Join(new_lines[starting_idx:ending_idx], "\n")
+}
+
+func reverseSlice(a []string) []string {
+	n := len(a)
+	res := make([]string, n)
+
+	for i := 0; i < n; i++ {
+		res[i] = a[i]
+	}
+	return res
 }
