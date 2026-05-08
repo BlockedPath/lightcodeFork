@@ -93,6 +93,7 @@ type model struct {
 	modelsListIndex    int
 	queue              []queue //[]string
 	currentContextSize int64
+	enter_api_win      bool
 }
 
 func initialModel() model {
@@ -197,6 +198,7 @@ func initialModel() model {
 		pastedImgs:         make(map[int][]byte),
 		pastedImgPreviews:  make(map[int]kittyPreview),
 		currentContextSize: 0,
+		enter_api_win:      false,
 	}
 	m.syncLayout()
 	return m
@@ -257,7 +259,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.messages) > 0 {
 			m.viewport.SetContent(renderMessages(m.messages, m.width))
 		}
-		m.viewport.GotoBottom()
+		// m.viewport.GotoBottom()
 	case tea.KeyPressMsg:
 		if m.islistSessionWin {
 			updatedModel, cmd := m.listSession.Update(msg)
@@ -281,6 +283,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.questionMode {
 			return m.handleQuestionInput(msg)
+		}
+		if m.enter_api_win {
+			return m.handleApiKeyWin(msg)
 		}
 		if m.isModelsListWin {
 			return m.handleModelsListInput(msg)
@@ -352,6 +357,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// 	m.adjustTextareaHeight()
 		// 	return m, nil
 		case "enter":
+			if m.enter_api_win {
+				return m, nil
+			}
 			if m.islistCommandsWin {
 				m.cacheIndex++
 				curCommand := m.listCommands.Current()
@@ -394,6 +402,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.textarea.SetValue("")
 			m.syncLayout()
 			return m, m.beginGeneration(val)
+		// case "esc":
+		// 	if m.enter_api_win {
+		// 		m.enter_api_win = false
+		// 	}
+		// 	return m, nil
 		case "shift+enter":
 			m.textarea.SetValue(m.textarea.Value() + "\n")
 			if len(strings.Split(m.textarea.Value(), "\n")) > m.textarea.Height() {
@@ -614,10 +627,12 @@ func (m model) View() tea.View {
 
 	}
 
-	sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.BrightCyan).Render(shortenDir(m.currentSession.Directory)))
+	// sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.BrightCyan).Render(shortenDir(m.currentSession.Directory)))
+	sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Render(shortenDir(m.currentSession.Directory)))
 
 	sections = append(sections, lipgloss.NewStyle().Render(strings.Repeat("—", m.width)))
 	textareaSectionIndex := len(sections)
+
 	sections = append(sections, m.textarea.View())
 	sections = append(sections, lipgloss.NewStyle().Render(strings.Repeat("—", m.width)))
 
@@ -707,6 +722,11 @@ func (m model) handleModelsListInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc", "enter":
 		m.isModelsListWin = false
 		m.textarea.Placeholder = "Send a message..."
+		model, _ := config.GetCurrentModel()
+		if model.ApiKey == "" {
+			m.enter_api_win = true
+			m.textarea.Placeholder = "enter api key for " + m.modelsList[m.modelsListIndex].Model
+		}
 		config.SetCurrentModel(m.modelsList[m.modelsListIndex])
 		m.textarea.Focus()
 		(&m).syncLayout()
@@ -882,6 +902,37 @@ func (m model) handleQuestionInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		return m, nil
+	}
+}
+
+func (m model) handleApiKeyWin(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		// logic
+
+		config.SetApiKey(m.modelsList[m.modelsListIndex], m.textarea.Value())
+		m.textarea.SetValue("")
+		m.enter_api_win = false
+		m.textarea.Placeholder = "send message..."
+		return m, nil
+	case "esc, ctrl+c":
+		m.enter_api_win = false
+		m.textarea.Placeholder = "send message..."
+		return m, nil
+	case "ctrl+v", "meta+v":
+		curVal := m.textarea.Value()
+		err := clipboard.Init()
+		if err != nil {
+			panic(err)
+		}
+		textBytes := clipboard.Read(clipboard.FmtText)
+		m.textarea.SetValue(curVal + string(textBytes))
+		return m, nil
+
+	default:
+		var cmd tea.Cmd
+		m.textarea, cmd = m.textarea.Update(msg)
+		return m, cmd
 	}
 }
 

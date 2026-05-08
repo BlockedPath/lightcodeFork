@@ -106,23 +106,27 @@ func GetModels() ([]ResModel, error) {
 	return models, nil
 }
 
-// func AddModel(model Model) error {
-// 	path, err := CustomizationPath()
-// 	if err != nil {
-// 		return errors.New("Error Adding model")
-// 	}
-// 	customization := GetCustomization()
-// 	customization.Models = append(customization.Models, model)
-// 	d, err := json.Marshal(customization)
-// 	if err != nil {
-// 		return errors.New("Error Adding model")
-// 	}
-// 	err = os.WriteFile(path, d, 0644)
-// 	if err != nil {
-// 		return errors.New("Error Adding model")
-// 	}
-// 	return nil
-// }
+func SetApiKey(m ResModel, apikey string) error {
+	customization := GetCustomization()
+	for i := range customization.Providers {
+		if customization.Providers[i].BaseUrl == m.BaseUrl {
+			customization.Providers[i].ApiKey = apikey
+		}
+	}
+	d, err := json.MarshalIndent(customization, "", " ")
+	if err != nil {
+		return errors.New("Error Setting api keyl")
+	}
+	path, err := CustomizationPath()
+	if err != nil {
+		return errors.New("Error Setting current model")
+	}
+	err = os.WriteFile(path, d, 0644)
+	if err != nil {
+		return errors.New("Error Setting current model")
+	}
+	return nil
+}
 
 func SetCurrentModel(model ResModel) error {
 	customization := GetCustomization()

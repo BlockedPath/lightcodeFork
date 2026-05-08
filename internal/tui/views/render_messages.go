@@ -100,7 +100,8 @@ func formatToolResult(content string, codeChanges []string, width int, tc models
 	oldlines = strings.Split(codeChanges[0], "\n")
 	newlines = strings.Split(codeChanges[1], "\n")
 
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Red).Render(fmt.Sprintf("-%d", len(oldlines))) + " " + lipgloss.NewStyle().Foreground(lipgloss.Green).Render(fmt.Sprintf("+%d", len(newlines))) + "\n")
+	top := lipgloss.NewStyle().Foreground(lipgloss.Red).Render(fmt.Sprintf("-%d", len(oldlines))) + " " + lipgloss.NewStyle().Foreground(lipgloss.Green).Render(fmt.Sprintf("+%d", len(newlines))) + "\n"
+	// sb.WriteString()
 
 	if tc.Name == "write_file" {
 		line_limit := 20
@@ -131,7 +132,7 @@ func formatToolResult(content string, codeChanges []string, width int, tc models
 		sb.WriteString("\n")
 
 	}
-	return sb.String()
+	return top + lipgloss.NewStyle().Margin(2).MarginTop(0).MarginBottom(0).Render(sb.String())
 }
 
 var lightcodeGlamourStyle = []byte(`{
@@ -331,7 +332,7 @@ func renderMessages(msgs []models.Message, width int) string {
 			case "tool_call":
 				for _, toolcall := range d.ToolCalls {
 					lines = append(lines, dot+" "+formatToolCall(toolcall))
-					resultSummary := formatToolResult(content, d.CodeChanges, width, toolcall)
+					resultSummary := formatToolResult(content, d.CodeChanges, width-4, toolcall)
 					if resultSummary != "" {
 						lines = append(lines, tree+" "+resultSummary)
 					}
