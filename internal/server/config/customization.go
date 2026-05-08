@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sort"
+	"time"
 )
 
 // ```bash
@@ -14,11 +16,12 @@ import (
 // API_URL=http://localhost:8080
 // ```
 type Customization struct {
-	SkillsPath   string     `json:"skills_path"`
-	Port         string     `json:"port"`
-	Theme        string     `json:"theme"`
-	Providers    []Provider `json:"providers"`
-	CurrentModel ResModel   `json:"current_model"`
+	SkillsPath   string         `json:"skills_path"`
+	Port         string         `json:"port"`
+	Theme        string         `json:"theme"`
+	Providers    []Provider     `json:"providers"`
+	CurrentModel ResModel       `json:"current_model"`
+	RecentModels []RecentModels `json:"recent_models"`
 }
 
 type Provider struct {
@@ -27,24 +30,31 @@ type Provider struct {
 	Models  []string `json:"models"`
 }
 
-// type Model struct {
-// 	Model string `json:"model"`
-// }
-
 type ResModel struct {
 	Model   string `json:"model"`
 	ApiKey  string `json:"api_key"`
 	BaseUrl string `json:"base_url"`
+}
+type RecentModels struct {
+	Model    string `json:"model"`
+	ApiKey   string `json:"api_key"`
+	BaseUrl  string `json:"base_url"`
+	LastUsed int64  `json:"last_used"`
+}
+type AllModels struct {
+	Models       []ResModel
+	RecentModels []RecentModels
 }
 
 func CustomizationPath() (string, error) {
 	path := filepath.Join(Dir(), "config.json")
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		bare := Customization{
-			Theme:      "light",
-			SkillsPath: filepath.Join(Dir(), "skills"),
-			Port:       "8080",
-			Providers:  []Provider{},
+			Theme:        "light",
+			SkillsPath:   filepath.Join(Dir(), "skills"),
+			Port:         "8080",
+			Providers:    getDefaultProviders(),
+			CurrentModel: ResModel{},
 		}
 		d, err := json.MarshalIndent(bare, "", " ")
 		if err != nil {
@@ -91,7 +101,7 @@ func SetTheme(theme string) error {
 	return nil
 }
 
-func GetModels() ([]ResModel, error) {
+func GetModels() ([]ResModel, []RecentModels, error) {
 	providers := GetCustomization().Providers
 	models := []ResModel{}
 	for _, provider := range providers {
@@ -103,7 +113,7 @@ func GetModels() ([]ResModel, error) {
 			})
 		}
 	}
-	return models, nil
+	return models, GetCustomization().RecentModels, nil
 }
 
 func SetApiKey(m ResModel, apikey string) error {
@@ -128,9 +138,34 @@ func SetApiKey(m ResModel, apikey string) error {
 	return nil
 }
 
+func GetRecentModels() []RecentModels {
+	customization := GetCustomization()
+	return customization.RecentModels
+}
+
 func SetCurrentModel(model ResModel) error {
 	customization := GetCustomization()
 	customization.CurrentModel = model
+	r := customization.RecentModels
+	changed := false
+	if len(r) != 0 {
+		for i, m := range r {
+			if m.BaseUrl == model.BaseUrl && m.Model == model.Model {
+				r[i].LastUsed = time.Now().Unix()
+				changed = true
+			}
+		}
+	}
+
+	if !changed {
+		r = append(r, RecentModels{
+			Model:    model.Model,
+			ApiKey:   model.ApiKey,
+			BaseUrl:  model.BaseUrl,
+			LastUsed: time.Now().Unix(),
+		})
+	}
+	customization.RecentModels = r
 	d, err := json.MarshalIndent(customization, "", " ")
 	if err != nil {
 		return errors.New("Error Setting current model")
@@ -147,12 +182,17 @@ func SetCurrentModel(model ResModel) error {
 }
 
 func GetCurrentModel() (ResModel, error) {
-	if GetCustomization().CurrentModel.Model == "" {
-		models, err := GetModels()
-		if err != nil {
-			return ResModel{}, err
-		}
+	models, recent_models, err := GetModels()
+	sort.Slice(recent_models, func(i, j int) bool {
+		return recent_models[i].LastUsed < recent_models[j].LastUsed
+	})
+	if err != nil {
+		return ResModel{}, err
+	}
+	if len(recent_models) > 0 {
+		r := recent_models[0]
+		return ResModel{Model: r.Model, ApiKey: r.ApiKey, BaseUrl: r.BaseUrl}, nil
+	} else {
 		return models[0], nil
 	}
-	return GetCustomization().CurrentModel, nil
 }

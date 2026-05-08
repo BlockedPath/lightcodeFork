@@ -195,25 +195,25 @@ func GetContextSize(session_id string) int64 {
 	}
 	return contextSize
 }
-func GetModels() ([]config.ResModel, error) {
+func GetModels() ([]config.ResModel, []config.RecentModels, error) {
 	resp, err := http.Get(baseUrl + "/get-models")
 	if err != nil {
 		log.Fatal(err)
-		return []config.ResModel{}, err
+		return []config.ResModel{}, []config.RecentModels{}, err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatal(err)
-		return []config.ResModel{}, err
+		return []config.ResModel{}, []config.RecentModels{}, err
 	}
-	var modelsList []config.ResModel
+	var modelsList config.AllModels
 	err = json.Unmarshal(body, &modelsList)
 	if err != nil {
 		log.Fatal(err)
-		return []config.ResModel{}, err
+		return []config.ResModel{}, []config.RecentModels{}, err
 	}
-	return modelsList, nil
+	return modelsList.Models, modelsList.RecentModels, nil
 }
 func GetCurrentModel() (config.ResModel, error) {
 	resp, err := http.Get(baseUrl + "/get-current-model")

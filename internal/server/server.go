@@ -213,11 +213,15 @@ func getCurrentModel(w http.ResponseWriter, r *http.Request) {
 }
 
 func getModels(w http.ResponseWriter, r *http.Request) {
-	list_models, err := config.GetModels()
+	list_models, recent_models, err := config.GetModels()
 	if err != nil {
 
 	}
-	json.NewEncoder(w).Encode(list_models)
+	payload := config.AllModels{
+		Models:       list_models,
+		RecentModels: recent_models,
+	}
+	json.NewEncoder(w).Encode(payload)
 }
 
 func randomSessionID() string {

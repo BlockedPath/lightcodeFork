@@ -2,6 +2,8 @@ package views
 
 import (
 	"fmt"
+	"slices"
+	"sort"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -72,7 +74,19 @@ func deleteCurrentSession(m *model) {
 func openModelsList(m *model) {
 	m.textarea.Reset()
 	// list, err := config.GetModels()
-	list, err := client.GetModels()
+	list, recentModels, err := client.GetModels()
+
+	sort.Slice(recentModels, func(i, j int) bool {
+		return recentModels[i].LastUsed < recentModels[j].LastUsed
+	})
+	for _, recentModel := range recentModels {
+		list = append(list, config.ResModel{
+			Model:   recentModel.Model,
+			ApiKey:  recentModel.ApiKey,
+			BaseUrl: recentModel.BaseUrl,
+		})
+	}
+	slices.Reverse(list)
 	if err != nil {
 		list = []config.ResModel{}
 	}

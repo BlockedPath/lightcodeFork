@@ -9,6 +9,7 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -148,7 +149,18 @@ func initialModel() model {
 	spin.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	// modelsList, err := config.GetModels()
-	modelsList, err := client.GetModels()
+	modelsList, recentModels, err := client.GetModels()
+	sort.Slice(recentModels, func(i, j int) bool {
+		return recentModels[i].LastUsed < recentModels[j].LastUsed
+	})
+	for _, recentModel := range recentModels {
+		modelsList = append(modelsList, config.ResModel{
+			Model:   recentModel.Model,
+			ApiKey:  recentModel.ApiKey,
+			BaseUrl: recentModel.BaseUrl,
+		})
+	}
+	slices.Reverse(modelsList)
 	if len(modelsList) == 0 {
 		fmt.Println("No models found, add models in ~/.lightcode/config.json")
 		os.Exit(1)
@@ -278,6 +290,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.syncLayout()
 				m.viewport.SetContent(renderMessages(m.messages, m.width))
 				m.viewport.GotoBottom()
+			case "esc":
+				m.islistSessionWin = false
+				return m, nil
 			}
 			return m, cmd
 		}
