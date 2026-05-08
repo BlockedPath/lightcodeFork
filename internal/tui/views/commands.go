@@ -71,30 +71,42 @@ func deleteCurrentSession(m *model) {
 	resetCurrentSession(m)
 }
 
-func openModelsList(m *model) {
-	m.textarea.Reset()
-	// list, err := config.GetModels()
-	list, recentModels, err := client.GetModels()
+type item config.ResModel
+
+func (i item) FilterValue() string { return i.Model }
+
+func loadModelsList() ([]config.ResModel, error) {
+	modelsList, recentModels, err := client.GetModels()
+	if err != nil {
+		return []config.ResModel{}, err
+	}
 
 	sort.Slice(recentModels, func(i, j int) bool {
 		return recentModels[i].LastUsed < recentModels[j].LastUsed
 	})
 	for _, recentModel := range recentModels {
-		list = append(list, config.ResModel{
+		modelsList = append(modelsList, config.ResModel{
 			Model:   recentModel.Model,
 			ApiKey:  recentModel.ApiKey,
 			BaseUrl: recentModel.BaseUrl,
 		})
 	}
-	slices.Reverse(list)
+	slices.Reverse(modelsList)
+	return modelsList, nil
+}
+
+func openModelsList(m *model) {
+	modelsList, err := loadModelsList()
 	if err != nil {
-		list = []config.ResModel{}
+		modelsList = []config.ResModel{}
 	}
-	m.modelsList = list
-	m.modelsListIndex = 0
+	m.textarea.Reset()
+	m.modelsList = modelsList
+	m.listModels.Refresh(modelsList)
+	m.listModels.Filter("")
 	m.isModelsListWin = true
-	m.textarea.Placeholder = "↑↓ select · Enter/Esc close"
-	m.textarea.Blur()
+	m.textarea.Placeholder = "type to filter · ↑↓ select · Enter/Esc close"
+	m.textarea.Focus()
 	m.syncLayout()
 }
 

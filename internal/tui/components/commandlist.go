@@ -10,6 +10,31 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
+type item struct {
+	name        string
+	description string
+}
+
+var COMMANDS = []item{
+	{name: "sessions", description: "List and switch sessions"},
+	{name: "new_session", description: "Start a fresh session"},
+	{name: "delete_session", description: "Delete the current session"},
+	{name: "skills", description: "Show available skills"},
+	{name: "models", description: "Browse and select models"},
+	{name: "usage", description: "Show token usage for the session"},
+	{name: "dir", description: "Show the current session directory"},
+}
+
+func longest_word() string {
+	longest := ""
+	for _, stuff := range COMMANDS {
+		if len(stuff.name) > len(longest) {
+			longest = stuff.name
+		}
+	}
+	return longest
+}
+
 type styles struct {
 	title        lipgloss.Style
 	item         lipgloss.Style
@@ -30,12 +55,12 @@ func newStyles(darkBG bool) styles {
 	return s
 }
 
-type item string
-
-func (i item) FilterValue() string { return string(i) }
+func (i item) FilterValue() string { return i.name + " " + i.description }
+func (i item) Name() string        { return i.name }
 
 type itemDelegate struct {
-	styles *styles
+	styles       *styles
+	longest_word string
 }
 
 func (d itemDelegate) Height() int                             { return 1 }
@@ -46,13 +71,17 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 	if !ok {
 		return
 	}
-
-	str := fmt.Sprintf("%s", i)
+	pad := len(d.longest_word) - len(i.name) + 1
+	if pad < 1 {
+		pad = 1
+	}
+	str := i.name + strings.Repeat(" ", pad) + " " + i.description
 
 	fn := d.styles.item.Render
 	if index == m.Index() {
 		fn = func(s ...string) string {
-			return d.styles.selectedItem.Render(lipgloss.NewStyle().Foreground(lipgloss.BrightCyan).Render("→ " + strings.Join(s, " ")))
+			temp := lipgloss.NewStyle().Foreground(lipgloss.BrightCyan).Render("→ " + strings.Join(s, " "))
+			return d.styles.selectedItem.Render(temp)
 		}
 	}
 
@@ -69,14 +98,17 @@ type ModelCmdList struct {
 }
 
 func initialModel() ModelCmdList {
-	items := []list.Item{
-		item("sessions"),
-		item("new_session"),
-		item("delete_session"),
-		item("skills"),
-		item("models"),
-		item("usage"),
-		item("dir"),
+	items := []list.Item{}
+	// 	item{name: "sessions", description: "List and switch sessions"},
+	// 	item{name: "new_session", description: "Start a fresh session"},
+	// 	item{name: "delete_session", description: "Delete the current session"},
+	// 	item{name: "skills", description: "Show available skills"},
+	// 	item{name: "models", description: "Browse and select models"},
+	// 	item{name: "usage", description: "Show token usage for the session"},
+	// 	item{name: "dir", description: "Show the current session directory"},
+	// }
+	for _, it := range COMMANDS {
+		items = append(items, item{name: it.name, description: it.description})
 	}
 
 	const defaultWidth = 20
@@ -88,7 +120,6 @@ func initialModel() ModelCmdList {
 	l.SetShowPagination(false)
 	l.SetShowTitle(false)
 	l.SetShowFilter(false)
-	l.SetDelegate(list.DefaultDelegate{})
 
 	m := ModelCmdList{list: l, allItems: items}
 	m.updateStyles(true) // default to dark styles.
@@ -102,7 +133,7 @@ func (m *ModelCmdList) Filter(term string) {
 	}
 	var filtered []list.Item
 	for _, i := range m.allItems {
-		if strings.Contains(strings.ToLower(string(i.(item))), strings.ToLower(term)) {
+		if strings.Contains(strings.ToLower(i.FilterValue()), strings.ToLower(term)) {
 			filtered = append(filtered, i)
 		}
 	}
@@ -114,7 +145,7 @@ func (m *ModelCmdList) updateStyles(isDark bool) {
 	m.list.Styles.Title = m.styles.title
 	m.list.Styles.PaginationStyle = m.styles.pagination
 	m.list.Styles.HelpStyle = m.styles.help
-	m.list.SetDelegate(itemDelegate{styles: &m.styles})
+	m.list.SetDelegate(itemDelegate{styles: &m.styles, longest_word: longest_word()})
 }
 
 func (m ModelCmdList) Init() tea.Cmd {
@@ -157,7 +188,7 @@ func (m ModelCmdList) Current() string {
 	if !ok {
 		return ""
 	}
-	return string(it)
+	return it.name
 }
 
 func (m ModelCmdList) Height() int {

@@ -9,7 +9,6 @@ import (
 	"os"
 	"regexp"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -53,45 +52,47 @@ type kittyPreview struct {
 }
 
 type model struct {
-	viewport           viewport.Model
-	islistSessionWin   bool
-	islistCommandsWin  bool
-	listSession        components.Model
-	listCommands       components.ModelCmdList
-	sessions           []models.Session
-	currentSession     models.Session
-	messages           []models.Message
-	textarea           textarea.Model
-	pasteCounter       int
-	pastedTexts        map[int]string
-	imgPasteCounter    int
-	pastedImgs         map[int][]byte
-	pastedImgPreviews  map[int]kittyPreview
-	senderStyle        lipgloss.Style
-	err                error
-	cache              map[int]string
-	cacheIndex         int
-	streamCh           chan models.StoredMessageData
-	width              int
-	height             int
-	bashMode           bool
-	streamch           chan models.StoredMessageData
-	cancelStream       context.CancelFunc
-	spinner            spinner.Model
-	isGenerating       bool
-	lastEsc            time.Time
-	showEscMsg         bool
-	questionMode       bool
-	questions          []questionItem
-	questionIdx        int
-	questionAnswers    []string
-	questionSelected   int
-	todoList           []models.ToDo
-	modes              []string
-	mode               string
-	modelsList         []config.ResModel
-	isModelsListWin    bool
-	modelsListIndex    int
+	viewport          viewport.Model
+	islistSessionWin  bool
+	islistCommandsWin bool
+	listSession       components.Model
+	listCommands      components.ModelCmdList
+	listModels        components.ModelModelsList
+	sessions          []models.Session
+	currentSession    models.Session
+	messages          []models.Message
+	textarea          textarea.Model
+	pasteCounter      int
+	pastedTexts       map[int]string
+	imgPasteCounter   int
+	pastedImgs        map[int][]byte
+	pastedImgPreviews map[int]kittyPreview
+	senderStyle       lipgloss.Style
+	err               error
+	cache             map[int]string
+	cacheIndex        int
+	streamCh          chan models.StoredMessageData
+	width             int
+	height            int
+	bashMode          bool
+	streamch          chan models.StoredMessageData
+	cancelStream      context.CancelFunc
+	spinner           spinner.Model
+	isGenerating      bool
+	lastEsc           time.Time
+	showEscMsg        bool
+	questionMode      bool
+	questions         []questionItem
+	questionIdx       int
+	questionAnswers   []string
+	questionSelected  int
+	todoList          []models.ToDo
+	modes             []string
+	mode              string
+	modelsList        []config.ResModel
+	isModelsListWin   bool
+	modelsListIndex   int
+
 	queue              []queue //[]string
 	currentContextSize int64
 	enter_api_win      bool
@@ -148,25 +149,13 @@ func initialModel() model {
 	spin.Spinner = spinner.MiniDot
 	spin.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
-	// modelsList, err := config.GetModels()
-	modelsList, recentModels, err := client.GetModels()
-	sort.Slice(recentModels, func(i, j int) bool {
-		return recentModels[i].LastUsed < recentModels[j].LastUsed
-	})
-	for _, recentModel := range recentModels {
-		modelsList = append(modelsList, config.ResModel{
-			Model:   recentModel.Model,
-			ApiKey:  recentModel.ApiKey,
-			BaseUrl: recentModel.BaseUrl,
-		})
+	modelsList, err := loadModelsList()
+	if err != nil {
+		modelsList = []config.ResModel{}
 	}
-	slices.Reverse(modelsList)
 	if len(modelsList) == 0 {
 		fmt.Println("No models found, add models in ~/.lightcode/config.json")
 		os.Exit(1)
-	}
-	if err != nil {
-		modelsList = []config.ResModel{}
 	}
 
 	// currentModel, err := config.GetCurrentModel()
@@ -194,6 +183,7 @@ func initialModel() model {
 		bashMode:           false,
 		listSession:        components.LaunchSessionList(sessionItems),
 		listCommands:       components.LaunchCommandList(),
+		listModels:         components.LaunchModelsList(),
 		sessions:           sessions,
 		senderStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
 		err:                nil,
@@ -212,6 +202,7 @@ func initialModel() model {
 		currentContextSize: 0,
 		enter_api_win:      false,
 	}
+	m.listModels.Refresh(modelsList)
 	m.syncLayout()
 	return m
 }
@@ -247,7 +238,7 @@ func (m *model) syncLayout() {
 		reservedHeight += m.questionUIHeight()
 	}
 	if m.isModelsListWin {
-		reservedHeight += m.modelsListHeight()
+		reservedHeight += m.listModels.Height()
 	}
 	// for textarea border
 	reservedHeight += 2
@@ -623,9 +614,6 @@ func (m model) View() tea.View {
 	if m.questionMode {
 		sections = append(sections, m.renderQuestionUI())
 	}
-	if m.isModelsListWin {
-		sections = append(sections, m.renderModelsList())
-	}
 	if len(m.queue) > 0 {
 		sections = append(sections, m.renderQueueList())
 	}
@@ -642,8 +630,12 @@ func (m model) View() tea.View {
 
 	}
 
-	// sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.BrightCyan).Render(shortenDir(m.currentSession.Directory)))
-	sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Render(shortenDir(m.currentSession.Directory)))
+	// sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Render(shortenDir(m.currentSession.Directory)))
+	if m.enter_api_win {
+		sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.BrightRed).Render("enter api key for "+m.listModels.Current().Model))
+	} else {
+		sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.BrightCyan).Render(shortenDir(m.currentSession.Directory)))
+	}
 
 	sections = append(sections, lipgloss.NewStyle().Render(strings.Repeat("—", m.width)))
 	textareaSectionIndex := len(sections)
@@ -651,7 +643,7 @@ func (m model) View() tea.View {
 	sections = append(sections, m.textarea.View())
 	sections = append(sections, lipgloss.NewStyle().Render(strings.Repeat("—", m.width)))
 
-	if !m.islistCommandsWin {
+	if !m.islistCommandsWin && !m.isModelsListWin {
 		// mode and model name
 		s := strings.ToUpper(m.mode[:1]) + m.mode[1:] + " "
 		model_name := m.modelsList[m.modelsListIndex].Model
@@ -676,6 +668,9 @@ func (m model) View() tea.View {
 
 	if m.islistCommandsWin {
 		sections = append(sections, m.listCommands.StringView())
+	}
+	if m.isModelsListWin {
+		sections = append(sections, m.listModels.StringView())
 	}
 
 	v := tea.NewView(strings.Join(sections, "\n"))
@@ -735,38 +730,42 @@ func (m model) handleModelsListInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+c":
 		return m, tea.Quit
 	case "esc", "enter":
+		selectedModel := m.listModels.Current()
 		m.isModelsListWin = false
+		m.textarea.SetValue("")
 		m.textarea.Placeholder = "Send a message..."
-		model, _ := config.GetCurrentModel()
-		if model.ApiKey == "" {
-			m.enter_api_win = true
-			m.textarea.Placeholder = "enter api key for " + m.modelsList[m.modelsListIndex].Model
+		if msg.String() == "enter" && selectedModel.Model != "" {
+			m.modelsListIndex = findModelIndex(m.modelsList, selectedModel)
+			if selectedModel.ApiKey == "" {
+				m.enter_api_win = true
+				m.textarea.Placeholder = "enter api key for " + selectedModel.Model
+			}
+			config.SetCurrentModel(selectedModel)
 		}
-		config.SetCurrentModel(m.modelsList[m.modelsListIndex])
+
 		m.textarea.Focus()
 		(&m).syncLayout()
 		return m, nil
-	case "up":
-		if len(m.modelsList) == 0 {
-			return m, nil
-		}
-		m.modelsListIndex--
-		if m.modelsListIndex < 0 {
-			m.modelsListIndex = len(m.modelsList) - 1
-		}
-		return m, nil
-	case "down":
-		if len(m.modelsList) == 0 {
-			return m, nil
-		}
-		m.modelsListIndex++
-		if m.modelsListIndex >= len(m.modelsList) {
-			m.modelsListIndex = 0
-		}
-		return m, nil
+	case "up", "down":
+		updatedModel, cmd := m.listModels.Update(msg)
+		m.listModels = updatedModel.(components.ModelModelsList)
+		return m, cmd
 	default:
-		return m, nil
+		var cmd tea.Cmd
+		m.textarea, cmd = m.textarea.Update(msg)
+		m.listModels.Filter(m.textarea.Value())
+		m.syncLayout()
+		return m, cmd
 	}
+}
+
+func findModelIndex(modelsList []config.ResModel, selectedModel config.ResModel) int {
+	for i, model := range modelsList {
+		if model.Model == selectedModel.Model && model.BaseUrl == selectedModel.BaseUrl {
+			return i
+		}
+	}
+	return 0
 }
 func parseQuestions(content string) []questionItem {
 	var args map[string]any
@@ -811,31 +810,6 @@ func (m model) renderQueueList() string {
 		lines = append(lines, styleOptionNormal.Render(" "+strconv.Itoa(i+1)+".) "+label.prompt))
 	}
 	return strings.Join(lines, "\n")
-}
-
-func (m model) renderModelsList() string {
-	header := styleQuestionHeader.Render("Models")
-	lines := []string{header}
-	if len(m.modelsList) == 0 {
-		lines = append(lines, styleOptionNormal.Render(" no models configured"))
-		return strings.Join(lines, "\n")
-	}
-	for i, ent := range m.modelsList {
-		label := ent.Model
-		if i == m.modelsListIndex {
-			lines = append(lines, styleOptionSelected.Render("  ▸ "+label))
-		} else {
-			lines = append(lines, styleOptionNormal.Render("    "+label))
-		}
-	}
-	return strings.Join(lines, "\n")
-}
-
-func (m model) modelsListHeight() int {
-	if len(m.modelsList) == 0 {
-		return 2
-	}
-	return 1 + len(m.modelsList)
 }
 
 func (m model) renderQuestionUI() string {
@@ -923,16 +897,20 @@ func (m model) handleQuestionInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (m model) handleApiKeyWin(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
-		// logic
 
 		config.SetApiKey(m.modelsList[m.modelsListIndex], m.textarea.Value())
 		m.textarea.SetValue("")
 		m.enter_api_win = false
-		m.textarea.Placeholder = "send message..."
+		m.textarea.Placeholder = "Send a message..."
+		m.textarea.Focus()
+		m.syncLayout()
 		return m, nil
-	case "esc, ctrl+c":
+	case "esc", "ctrl+c":
 		m.enter_api_win = false
-		m.textarea.Placeholder = "send message..."
+		m.textarea.SetValue("")
+		m.textarea.Placeholder = "Send a message..."
+		m.textarea.Focus()
+		m.syncLayout()
 		return m, nil
 	case "ctrl+v", "meta+v":
 		curVal := m.textarea.Value()
