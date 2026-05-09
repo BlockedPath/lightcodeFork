@@ -1,77 +1,90 @@
-
 name: Go
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
     tags: ["v*"]
+
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
-
   build:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
-            goos: linux
+          - goos: linux
             goarch: amd64
-            binary: lightcode
+            binary: lightcode-linux-amd64
 
-          - os: ubuntu-latest
-            goos: linux
+          - goos: linux
             goarch: arm64
-            binary: lightcode
+            binary: lightcode-linux-arm64
 
-          - os: macos-latest
-            goos: darwin
+          - goos: darwin
             goarch: amd64
-            binary: lightcode
+            binary: lightcode-darwin-amd64
 
-          - os: macos-latest
-            goos: darwin
+          - goos: darwin
             goarch: arm64
-            binary: lightcode
+            binary: lightcode-darwin-arm64
 
-          - os: windows-latest
-            goos: windows
+          - goos: windows
             goarch: amd64
-            binary: lightcode.exe
+            binary: lightcode-windows-amd64.exe
 
-          - os: windows-latest
-            goos: windows
+          - goos: windows
             goarch: arm64
-            binary: lightcode.exe
+            binary: lightcode-windows-arm64.exe
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+
     steps:
-    - uses: actions/checkout@v6
+      - uses: actions/checkout@v6
 
-    - name: Set up Go
-      uses: actions/setup-go@v6
-      with:
-        go-version-file: 'go.mod'
-    
-    - name: Build dist darwin
-      run: mkdir -p dist
-      shell: bash
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
 
-    - name: Build
-      run: |
-        GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
-        go build -v -o dist/${{ matrix.binary }} ./cmd/lightcode
-      shell: bash
+      - name: Create dist directory
+        run: mkdir -p dist
 
-    - name: Upload binary
-      uses: actions/upload-artifact@v5
-      with:
-        name: lightcode-${{ matrix.goos }}-${{ matrix.goarch }}
-        path: dist/${{ matrix.binary }}
-    - name: Create Release
-      uses: softprops/action-gh-release@v2
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        files: dist/*
-    # - name: Test
-      # run: go test -v ./internal/tui/views
+      - name: Build
+        run: |
+          GOOS=${{ matrix.goos }} \
+          GOARCH=${{ matrix.goarch }} \
+          go build -v -o dist/${{ matrix.binary }} ./cmd/lightcode
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: ${{ matrix.binary }}
+          path: dist/${{ matrix.binary }}
+
+  release:
+    needs: build
+
+    if: startsWith(github.ref, 'refs/tags/')
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: dist
+
+      - name: Flatten files
+        run: |
+          mkdir -p release
+          find dist -type f -exec mv {} release/ \;
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
