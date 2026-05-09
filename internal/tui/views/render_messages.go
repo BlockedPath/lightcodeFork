@@ -175,7 +175,7 @@ var lightcodeGlamourStyle = []byte(`{
   },
   "h4": {
     "prefix": "◇ ",
-    "color": "37",
+    "color": "6",
     "bold": false
   },
   "h5": {
@@ -188,24 +188,24 @@ var lightcodeGlamourStyle = []byte(`{
   },
   "text": {},
   "strikethrough": { "crossed_out": true },
-  "emph": { "italic": true, "color": "245" },
-  "strong": { "bold": true, "color": "255" },
+  "emph": { "italic": true, "color": "8" },
+  "strong": { "bold": true, "color": "#41f7fa" },
   "hr": {
-    "color": "237",
+    "color": "8",
     "format": "\n──────────────────────────────────────\n"
   },
   "item": { "block_prefix": "• " },
   "enumeration": { "block_prefix": ". " },
   "task": { "ticked": "[✓] ", "unticked": "[ ] " },
-  "link": { "color": "51", "underline": true },
+  "link": { "color": "#41f7fa", "underline": true },
   "link_text": { "color": "43", "bold": true },
-  "image": { "color": "212", "underline": true },
-  "image_text": { "color": "243", "format": "Image: {{.text}} →" },
+  "image": { "color": "86", "underline": true },
+  "image_text": { "color": "8", "format": "Image: {{.text}} →" },
   "code": {
     "prefix": " ",
     "suffix": " ",
-    "color": "215",
-    "background_color": "235"
+    "color": "#96cfd8",
+    "background_color": "#212121"
   },
   "code_block": {
     "color": "252",

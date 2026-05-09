@@ -120,6 +120,7 @@ func (a *Agent) Run(ctx context.Context, prompt string, b64_imgs [][]byte, sessi
 
 			if DEBUG {
 				fmt.Println("token_count", token_count)
+				// fmt.Println("CHATS: ", chats)
 			}
 			if token_count >= CONTEXT_WINDOW {
 				// leave the last few chats before compacting memory

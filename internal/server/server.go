@@ -47,6 +47,8 @@ func Initialise(ready chan<- struct{}, port string, isDebug bool) {
 	http.HandleFunc("GET /get-available-skills", getAvailableSkills)
 	http.HandleFunc("GET /get-current-model", getCurrentModel)
 	http.HandleFunc("GET /get-models", getModels)
+	http.HandleFunc("POST /set-api-key", setApiKey)
+	http.HandleFunc("POST /set-current-model", setCurrentModel)
 	// http.ListenAndServe(":8080", nil)
 
 	ln, err := net.Listen("tcp", ":"+port)
@@ -222,6 +224,33 @@ func getModels(w http.ResponseWriter, r *http.Request) {
 		RecentModels: recent_models,
 	}
 	json.NewEncoder(w).Encode(payload)
+}
+
+func setApiKey(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Api_key string
+		model   config.ResModel
+	}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	err = config.SetApiKey(req.model, req.Api_key)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+}
+func setCurrentModel(w http.ResponseWriter, r *http.Request) {
+	var req config.ResModel
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	err = config.SetCurrentModel(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func randomSessionID() string {

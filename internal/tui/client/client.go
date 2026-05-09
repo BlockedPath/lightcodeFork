@@ -235,3 +235,34 @@ func GetCurrentModel() (config.ResModel, error) {
 	}
 	return cur_model, nil
 }
+
+func SetApiKey(m config.ResModel, apikey string) error {
+	body := struct {
+		Api_key string
+		model   config.ResModel
+	}{
+		Api_key: apikey,
+		model:   m,
+	}
+	bytess, err := json.Marshal(body)
+	if err != nil {
+
+	}
+	_, err = http.Post(baseUrl+"/get-current-model", "application/json", bytes.NewReader(bytess))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func SetCurrentModel(m config.ResModel) error {
+	bodybytes, err := json.Marshal(m)
+	if err != nil {
+
+	}
+	_, err = http.Post(baseUrl+"/set-current-model", "application/json", bytes.NewReader(bodybytes))
+	if err != nil {
+		return err
+	}
+	return nil
+}

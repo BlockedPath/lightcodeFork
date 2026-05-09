@@ -634,7 +634,7 @@ func (m model) View() tea.View {
 	if m.enter_api_win {
 		sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.BrightRed).Render("enter api key for "+m.listModels.Current().Model))
 	} else {
-		sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.BrightCyan).Render(shortenDir(m.currentSession.Directory)))
+		sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Render(shortenDir(m.currentSession.Directory)))
 	}
 
 	sections = append(sections, lipgloss.NewStyle().Render(strings.Repeat("—", m.width)))
@@ -740,7 +740,10 @@ func (m model) handleModelsListInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.enter_api_win = true
 				m.textarea.Placeholder = "enter api key for " + selectedModel.Model
 			}
-			config.SetCurrentModel(selectedModel)
+			err := client.SetCurrentModel(selectedModel)
+			if err != nil {
+
+			}
 		}
 
 		m.textarea.Focus()
@@ -898,7 +901,7 @@ func (m model) handleApiKeyWin(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 
-		config.SetApiKey(m.modelsList[m.modelsListIndex], m.textarea.Value())
+		client.SetApiKey(m.modelsList[m.modelsListIndex], m.textarea.Value())
 		m.textarea.SetValue("")
 		m.enter_api_win = false
 		m.textarea.Placeholder = "Send a message..."
@@ -942,8 +945,8 @@ func (m model) submitQuestionAnswers() (tea.Model, tea.Cmd) {
 	return m, m.beginGeneration(answer)
 }
 
-func (m model) getMouseSelection() {
-}
+// func (m model) getMouseSelection() {
+// }
 
 func (m model) currentKittyPreview() ([]kittyPreview, bool) {
 	re := regexp.MustCompile(`\[pasted img #(\d+)\]`)
