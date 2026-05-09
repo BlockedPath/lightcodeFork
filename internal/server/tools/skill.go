@@ -14,7 +14,7 @@ func Skill(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	if !ok {
 		return ToolResponse{Content: "Error: skillName is required and must be a string"}, nil
 	}
-	skillPath := skillPath()
+	skillPath := config.SkillsPath()
 	if skillPath == "" {
 		return ToolResponse{Content: "Skill path not found"}, nil
 	}
@@ -45,13 +45,6 @@ func Skill(ctx ToolContext, args map[string]any) (ToolResponse, error) {
 	skillFilesBlock := "\n<skill_files>\n" + strings.Join(skill_files, "\n") + "\n</skill_files>"
 	skill = "<skill_content name=\"" + skillName + "\">" + skill + skillFilesBlock + "</skill_content>"
 	return ToolResponse{Content: skill}, nil
-}
-
-func skillPath() string {
-	if path, ok := os.LookupEnv("SKILL_PATH"); ok {
-		return path
-	}
-	return config.SkillsPath()
 }
 
 func init() {

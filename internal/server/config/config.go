@@ -19,7 +19,3 @@ func SkillsPath() string {
 func DBPath() string {
 	return filepath.Join(Dir(), "lightcode.db")
 }
-
-// func EnvPath() string {
-// 	return filepath.Join(Dir(), ".env")
-// }

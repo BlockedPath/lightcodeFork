@@ -14,6 +14,10 @@ jobs:
       matrix:
         include:
           - goos: linux
+            goarch: amd64
+            binary: lightcode-linux-amd64
+
+          - goos: linux
             goarch: arm64
             binary: lightcode-linux-arm64
 
