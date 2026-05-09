@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -195,6 +196,31 @@ func GetContextSize(session_id string) int64 {
 	}
 	return contextSize
 }
+
+func CompactMemory(session_id string) (int64, error) {
+	resp, err := http.Get(baseUrl + "/compact-memory?session_id=" + url.QueryEscape(session_id))
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, errors.New(strings.TrimSpace(string(body)))
+	}
+
+	contextSize, err := strconv.ParseInt(strings.TrimSpace(string(body)), 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return contextSize, nil
+}
+
 func GetModels() ([]config.ResModel, []config.RecentModels, error) {
 	resp, err := http.Get(baseUrl + "/get-models")
 	if err != nil {

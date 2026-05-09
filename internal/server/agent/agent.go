@@ -124,7 +124,7 @@ func (a *Agent) Run(ctx context.Context, prompt string, b64_imgs [][]byte, sessi
 			}
 			if token_count >= CONTEXT_WINDOW {
 				// leave the last few chats before compacting memory
-				compactedMemory, err := compactMemory(chats)
+				compactedMemory, err := CompactMemory(chats)
 				if err != nil {
 					if DEBUG {
 						fmt.Println("Failed compacting memory with error : ", err)

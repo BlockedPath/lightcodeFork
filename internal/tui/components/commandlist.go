@@ -24,6 +24,7 @@ var COMMANDS = []item{
 	{name: "models", description: "Browse and select models"},
 	{name: "usage", description: "Show token usage for the session"},
 	{name: "dir", description: "Show the current session directory"},
+	{name: "compact", description: "Compact conversation"},
 }
 
 func longest_word() string {

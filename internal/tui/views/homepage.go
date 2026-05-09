@@ -52,48 +52,48 @@ type kittyPreview struct {
 }
 
 type model struct {
-	viewport          viewport.Model
-	islistSessionWin  bool
-	islistCommandsWin bool
-	listSession       components.Model
-	listCommands      components.ModelCmdList
-	listModels        components.ModelModelsList
-	sessions          []models.Session
-	currentSession    models.Session
-	messages          []models.Message
-	textarea          textarea.Model
-	pasteCounter      int
-	pastedTexts       map[int]string
-	imgPasteCounter   int
-	pastedImgs        map[int][]byte
-	pastedImgPreviews map[int]kittyPreview
-	senderStyle       lipgloss.Style
-	err               error
-	cache             map[int]string
-	cacheIndex        int
-	streamCh          chan models.StoredMessageData
-	width             int
-	height            int
-	bashMode          bool
-	streamch          chan models.StoredMessageData
-	cancelStream      context.CancelFunc
-	spinner           spinner.Model
-	isGenerating      bool
-	lastEsc           time.Time
-	showEscMsg        bool
-	questionMode      bool
-	questions         []questionItem
-	questionIdx       int
-	questionAnswers   []string
-	questionSelected  int
-	todoList          []models.ToDo
-	modes             []string
-	mode              string
-	modelsList        []config.ResModel
-	isModelsListWin   bool
-	modelsListIndex   int
-
-	queue              []queue //[]string
+	viewport           viewport.Model
+	islistSessionWin   bool
+	islistCommandsWin  bool
+	listSession        components.Model
+	listCommands       components.ModelCmdList
+	listModels         components.ModelModelsList
+	sessions           []models.Session
+	currentSession     models.Session
+	messages           []models.Message
+	textarea           textarea.Model
+	pasteCounter       int
+	pastedTexts        map[int]string
+	imgPasteCounter    int
+	pastedImgs         map[int][]byte
+	pastedImgPreviews  map[int]kittyPreview
+	senderStyle        lipgloss.Style
+	err                error
+	cache              map[int]string
+	cacheIndex         int
+	streamCh           chan models.StoredMessageData
+	width              int
+	height             int
+	bashMode           bool
+	streamch           chan models.StoredMessageData
+	cancelStream       context.CancelFunc
+	spinner            spinner.Model
+	isGenerating       bool
+	lastEsc            time.Time
+	showEscMsg         bool
+	questionMode       bool
+	questions          []questionItem
+	questionIdx        int
+	questionAnswers    []string
+	questionSelected   int
+	todoList           []models.ToDo
+	modes              []string
+	mode               string
+	modelsList         []config.ResModel
+	isModelsListWin    bool
+	modelsListIndex    int
+	isCompacting       bool
+	queue              []queue
 	currentContextSize int64
 	enter_api_win      bool
 }
@@ -216,7 +216,7 @@ func (m *model) syncLayout() {
 	m.viewport.SetWidth(m.width)
 
 	reservedHeight := m.textarea.Height()
-	if m.isGenerating {
+	if m.isGenerating || m.isCompacting {
 		reservedHeight++
 	}
 	if len(m.mode) > 0 {
@@ -514,7 +514,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseMotionMsg:
 
 	case spinner.TickMsg:
-		if !m.isGenerating {
+		if !m.isGenerating && !m.isCompacting {
 			return m, nil
 		}
 		var cmd tea.Cmd
@@ -591,6 +591,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.syncLayout()
 		return m, nil
 
+	case compactMemoryDoneMsg:
+		m.isCompacting = false
+		m.isGenerating = false
+		if msg.err != nil {
+			if m.currentSession.ID == msg.sessionID {
+				appendCommandStatusMessage(&m, fmt.Sprintf("Compaction failed: %s", msg.err.Error()))
+			}
+			return m, nil
+		}
+		if m.currentSession.ID != msg.sessionID {
+			return m, nil
+		}
+		m.messages = client.GetSessionData(m.currentSession.ID)
+		m.currentContextSize = msg.contextSize
+		m.messages = append(m.messages, models.Message{
+			SessionID: m.currentSession.ID,
+			Data:      models.EncodeMessageData(models.StoredMessageData{Role: "assistant", Content: "Compacted context"}),
+		})
+		m.refreshMessagesView()
+		m.syncLayout()
+		return m, nil
+
 	case clearEscMsgMsg:
 		m.showEscMsg = false
 		return m, nil
@@ -658,9 +680,11 @@ func (m model) View() tea.View {
 		sections = append(sections, lipgloss.JoinHorizontal(lipgloss.Bottom, mode, modelName, contextSize))
 	}
 
-	if m.isGenerating {
+	if m.isGenerating || m.isCompacting {
 		if m.showEscMsg {
 			sections = append(sections, m.spinner.View()+lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Render(" Press Esc again to cancel..."))
+		} else if m.isCompacting {
+			sections = append(sections, m.spinner.View()+" Compacting...")
 		} else {
 			sections = append(sections, m.spinner.View()+" Generating...")
 		}

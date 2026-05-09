@@ -15,6 +15,7 @@ import (
 	"github.com/Kartik-2239/lightcode/internal/server/config"
 	"github.com/Kartik-2239/lightcode/internal/server/db"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
+	"github.com/Kartik-2239/lightcode/internal/server/llm"
 	"gorm.io/gorm"
 )
 
@@ -49,6 +50,7 @@ func Initialise(ready chan<- struct{}, port string, isDebug bool) {
 	http.HandleFunc("GET /get-models", getModels)
 	http.HandleFunc("POST /set-api-key", setApiKey)
 	http.HandleFunc("POST /set-current-model", setCurrentModel)
+	http.HandleFunc("GET /compact-memory", compactMemory)
 	// http.ListenAndServe(":8080", nil)
 
 	ln, err := net.Listen("tcp", ":"+port)
@@ -251,6 +253,64 @@ func setCurrentModel(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func compactMemory(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.URL.Query().Get("session_id")
+	if sessionID == "" {
+		http.Error(w, `{"error":"session_id required"}`, http.StatusBadRequest)
+		return
+	}
+
+	var messages []models.Message
+	DB.Where("session_id = ?", sessionID).Find(&messages)
+	if len(messages) == 0 {
+		fmt.Fprint(w, 0)
+		return
+	}
+
+	chats := make([]llm.Chat, 0, len(messages))
+	slices.Reverse(messages)
+	for _, message := range messages {
+		d := models.DecodeMessageData(message.Data)
+		if strings.HasPrefix(d.Content, "<memory>") && strings.HasSuffix(d.Content, "</memory>") {
+			chats = append(chats, llm.Chat{Role: "user", Content: d.Content})
+			break
+		}
+		switch d.Role {
+		case "tool_call":
+			name, id := "tool", ""
+			if len(d.ToolCalls) > 0 {
+				name = d.ToolCalls[0].Name
+				id = d.ToolCalls[0].ID
+			}
+			chats = append(chats, llm.Chat{
+				Role:    "user",
+				Content: fmt.Sprintf("Tool %q (call_id=%s) output:\n%s", name, id, d.Content),
+			})
+		case "assistant":
+			chats = append(chats, llm.Chat{Role: "assistant", Content: d.Content})
+		default:
+			chats = append(chats, llm.Chat{Role: "user", Content: d.Content})
+		}
+	}
+	slices.Reverse(chats)
+
+	compactedMemory, err := agent.CompactMemory(chats)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	compactedMsg := models.Message{
+		SessionID: sessionID,
+		Data:      models.EncodeMessageData(compactedMemory),
+	}
+	if err := DB.Create(&compactedMsg).Error; err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprint(w, len(compactedMemory.Content)/4)
 }
 
 func randomSessionID() string {

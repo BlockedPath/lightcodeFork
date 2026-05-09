@@ -15,6 +15,18 @@ import (
 )
 
 type refreshSessionsMsg struct{}
+type compactMemoryDoneMsg struct {
+	sessionID   string
+	contextSize int64
+	err         error
+}
+
+func compactMemoryCmd(sessionID string) tea.Cmd {
+	return func() tea.Msg {
+		contextSize, err := client.CompactMemory(sessionID)
+		return compactMemoryDoneMsg{sessionID: sessionID, contextSize: contextSize, err: err}
+	}
+}
 
 func CmdHandler(cmd string, m *model) tea.Cmd {
 	switch cmd {
@@ -52,6 +64,18 @@ func CmdHandler(cmd string, m *model) tea.Cmd {
 		appendSkillsMessage(m)
 	case "/dir":
 		appendDirMessage(m)
+	case "/compact":
+		if m.currentSession.ID == "" {
+			appendCommandStatusMessage(m, "No active session selected.")
+			return nil
+		}
+		appendCommandStatusMessage(m, "\nCompacting...\n")
+		m.isCompacting = true
+		m.isGenerating = true
+		m.syncLayout()
+		m.viewport.GotoBottom()
+		return tea.Batch(compactMemoryCmd(m.currentSession.ID), m.spinner.Tick)
+
 	default:
 		return nil
 	}

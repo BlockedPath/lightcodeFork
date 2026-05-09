@@ -37,7 +37,7 @@ func predictTokenCount(messages []models.Message, i int) int64 {
 	return last_assistant_tokens + int64(len(models.DecodeMessageData(messages[i].Data).Content)/4)
 }
 
-func compactMemory(chats []llm.Chat) (models.StoredMessageData, error) {
+func CompactMemory(chats []llm.Chat) (models.StoredMessageData, error) {
 	summary, err := apiCall(chats)
 	if err != nil {
 		return models.StoredMessageData{}, err
