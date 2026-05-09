@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"os"
 	"slices"
 	"sort"
 	"strings"
@@ -29,6 +30,16 @@ func CmdHandler(cmd string, m *model) tea.Cmd {
 	case "/delete_session":
 		deleteCurrentSession(m)
 		return func() tea.Msg { return refreshSessionsMsg{} }
+
+	case "/export":
+		path, err := exportCurrentSessionMarkdown(m.currentSession)
+		if err != nil {
+			appendCommandStatusMessage(m, fmt.Sprintf("Export failed: %s", err.Error()))
+			return nil
+		}
+		home, _ := os.UserHomeDir()
+		appendCommandStatusMessage(m, fmt.Sprintf("Exported session to %s", strings.Replace(path, home, "~", 1)))
+		return nil
 
 	case "/models":
 		openModelsList(m)
