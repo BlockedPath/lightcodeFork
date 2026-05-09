@@ -19,6 +19,7 @@ var COMMANDS = []item{
 	{name: "sessions", description: "List and switch sessions"},
 	{name: "new_session", description: "Start a fresh session"},
 	{name: "delete_session", description: "Delete the current session"},
+	{name: "export", description: "Export the current session to markdown"},
 	{name: "skills", description: "Show available skills"},
 	{name: "models", description: "Browse and select models"},
 	{name: "usage", description: "Show token usage for the session"},
