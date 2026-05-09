@@ -1,0 +1,73 @@
+
+name: Go
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: ["v*"]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            binary: lightcode
+
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            binary: lightcode
+
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            binary: lightcode
+
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            binary: lightcode
+
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+            binary: lightcode.exe
+
+          - os: windows-latest
+            goos: windows
+            goarch: arm64
+            binary: lightcode.exe
+
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version-file: 'go.mod'
+    
+    - name: Build dist darwin
+      run: mkdir -p dist
+      shell: bash
+
+    - name: Build
+      run: |
+        GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+        go build -v -o dist/${{ matrix.binary }} ./cmd/lightcode
+      shell: bash
+
+    - name: Upload binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: lightcode-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: dist/${{ matrix.binary }}
+
+    # - name: Test
+      # run: go test -v ./internal/tui/views
