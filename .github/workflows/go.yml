@@ -68,6 +68,10 @@ jobs:
       with:
         name: lightcode-${{ matrix.goos }}-${{ matrix.goarch }}
         path: dist/${{ matrix.binary }}
-
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: dist/*
     # - name: Test
       # run: go test -v ./internal/tui/views
