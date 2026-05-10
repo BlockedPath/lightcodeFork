@@ -11,7 +11,7 @@ import (
 	"github.com/Kartik-2239/lightcode/internal/server/config"
 )
 
-const maxModelsListHeight = 10
+const maxModelsListHeight = 5
 
 type modelItem config.ResModel
 
@@ -46,12 +46,13 @@ type ModelModelsList struct {
 	list     list.Model
 	allItems []list.Item
 	styles   styles
+	height   int
 }
 
 func initialModelsList() ModelModelsList {
 	const defaultWidth = 20
-
-	l := list.New([]list.Item{}, modelItemDelegate{}, defaultWidth, 1)
+	const defaultHeight = 5
+	l := list.New([]list.Item{}, modelItemDelegate{}, defaultWidth, defaultHeight)
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
 	l.SetShowHelp(false)
@@ -59,8 +60,7 @@ func initialModelsList() ModelModelsList {
 	l.SetShowTitle(false)
 	l.SetShowFilter(false)
 	l.SetDelegate(list.DefaultDelegate{})
-
-	m := ModelModelsList{list: l, allItems: []list.Item{}}
+	m := ModelModelsList{list: l, allItems: []list.Item{}, height: defaultHeight}
 	m.updateStyles(true)
 	return m
 }
@@ -81,6 +81,9 @@ func (m *ModelModelsList) Filter(term string) {
 	m.list.SetHeight(modelsListHeight(len(filtered)))
 }
 
+func (m *ModelModelsList) GetHeight() int {
+	return m.height
+}
 func (m *ModelModelsList) Refresh(items []config.ResModel) {
 	listItems := make([]list.Item, len(items))
 	for i, model := range items {
@@ -125,6 +128,12 @@ func (m ModelModelsList) View() tea.View {
 
 func (m ModelModelsList) StringView() string {
 	return m.list.View()
+}
+func (m ModelModelsList) NextPage() {
+	m.list.NextPage()
+}
+func (m ModelModelsList) PrevPage() {
+	m.list.PrevPage()
 }
 
 func (m ModelModelsList) Current() config.ResModel {

@@ -28,6 +28,8 @@ import (
 	"golang.design/x/clipboard"
 )
 
+const textareaPrompt = "❯ "
+
 func LauchHomePage() {
 	p := tea.NewProgram(initialModel())
 	if _, err := p.Run(); err != nil {
@@ -101,15 +103,16 @@ type model struct {
 func initialModel() model {
 	ta := textarea.New()
 	ta.Placeholder = "enter to send message · / commands"
-	ta.SetVirtualCursor(false)
+	ta.SetVirtualCursor(true)
 	ta.Focus()
+	ta.Prompt = ""
 
-	ta.SetPromptFunc(1, func(pi textarea.PromptInfo) string {
-		if pi.LineNumber == 0 {
-			return "❯ "
-		}
-		return " "
-	})
+	// ta.SetPromptFunc(1, func(pi textarea.PromptInfo) string {
+	// 	if pi.LineNumber == 0 {
+	// 		return "❯ "
+	// 	}
+	// 	return " "
+	// })
 
 	ta.CharLimit = 32000
 
@@ -128,7 +131,7 @@ func initialModel() model {
 		width, height = w, h
 	}
 
-	ta.SetWidth(width)
+	ta.SetWidth(max(width-lipgloss.Width(textareaPrompt), 1))
 	ta.SetHeight(1)
 	ta.SetStyles(s)
 
@@ -212,7 +215,8 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m *model) syncLayout() {
-	m.textarea.SetWidth(m.width)
+	m.textarea.SetWidth(max(m.width-lipgloss.Width(textareaPrompt), 1))
+	m.resizeTextareaToContent()
 	m.viewport.SetWidth(m.width)
 
 	reservedHeight := m.textarea.Height()
@@ -250,6 +254,28 @@ func (m *model) syncLayout() {
 		viewportHeight = 1
 	}
 	m.viewport.SetHeight(viewportHeight)
+}
+
+func (m *model) resizeTextareaToContent() {
+	height := max(countWrappedLines(m.textarea.Value(), m.textarea.Width(), m), 1)
+	if height != m.textarea.Height() {
+		m.textarea.SetHeight(height)
+	}
+}
+
+func (m model) textareaView() string {
+	value := m.textarea.Value()
+	if value == "" {
+		value = m.textarea.Placeholder
+	}
+	lines := wrapTextLines(value, m.textarea.Width())
+	for len(lines) < m.textarea.Height() {
+		lines = append(lines, "")
+	}
+	if len(lines) > m.textarea.Height() {
+		lines = lines[:m.textarea.Height()]
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -351,10 +377,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.pasteCounter++
 				m.pastedTexts[m.pasteCounter] = pasteValue
 				placeholder := fmt.Sprintf("[pasted text #%d]", m.pasteCounter)
-				m.textarea.SetValue(strings.TrimSpace(nextVal + " " + placeholder))
+				m.textarea.InsertString(strings.TrimSpace(placeholder))
+				// m.textarea.SetValue()
 			} else {
-				m.textarea.SetValue(nextVal + pasteValue)
+				// m.textarea.SetValue(nextVal + pasteValue)
+				m.textarea.InsertString(strings.TrimSpace(pasteValue))
 			}
+
+			if len(strings.Split(curVal, "\n")) > len(strings.Split(m.textarea.Value(), "\n")) {
+				if m.textarea.Height()-1 >= 1 {
+					m.textarea.SetHeight(m.textarea.Height() - 1)
+				}
+			}
+			if len(strings.Split(curVal, "\n")) < len(strings.Split(m.textarea.Value(), "\n")) {
+				m.textarea.SetHeight(m.textarea.Height() + 1)
+			}
+			m.resizeTextareaToContent()
 			m.syncLayout()
 			return m, cmd
 		// case "shift+enter":
@@ -408,16 +446,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.textarea.SetValue("")
 			m.syncLayout()
 			return m, m.beginGeneration(val)
-		// case "esc":
-		// 	if m.enter_api_win {
-		// 		m.enter_api_win = false
-		// 	}
-		// 	return m, nil
 		case "shift+enter":
 			m.textarea.SetValue(m.textarea.Value() + "\n")
-			if len(strings.Split(m.textarea.Value(), "\n")) > m.textarea.Height() {
-				m.textarea.SetHeight(m.textarea.Height() + 1)
-			}
+			m.resizeTextareaToContent()
 			m.syncLayout()
 			return m, nil
 		case "up", "down":
@@ -477,16 +508,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, cmd
 			}
 			var cmd tea.Cmd
-			original := m.textarea.Value()
 			m.textarea, cmd = m.textarea.Update(msg)
-			if len(strings.Split(original, "\n")) > len(strings.Split(m.textarea.Value(), "\n")) {
-				if m.textarea.Height()-1 >= 1 {
-					m.textarea.SetHeight(m.textarea.Height() - 1)
-				}
-			}
-			if len(strings.Split(original, "\n")) < len(strings.Split(m.textarea.Value(), "\n")) {
-				m.textarea.SetHeight(m.textarea.Height() + 1)
-			}
+			m.resizeTextareaToContent()
 			m.syncLayout()
 			// m.adjustTextareaHeight()
 
@@ -662,7 +685,7 @@ func (m model) View() tea.View {
 	sections = append(sections, lipgloss.NewStyle().Render(strings.Repeat("—", m.width)))
 	textareaSectionIndex := len(sections)
 
-	sections = append(sections, m.textarea.View())
+	sections = append(sections, lipgloss.JoinHorizontal(lipgloss.Top, textareaPrompt, m.textareaView()))
 	sections = append(sections, lipgloss.NewStyle().Render(strings.Repeat("—", m.width)))
 
 	if !m.islistCommandsWin && !m.isModelsListWin {
@@ -698,10 +721,11 @@ func (m model) View() tea.View {
 	}
 
 	v := tea.NewView(strings.Join(sections, "\n"))
-	c := m.textarea.Cursor()
+	c := tea.NewCursor(wrappedCursorPosition(m.textarea.Value(), m.textarea.Line(), m.textarea.Column(), m.textarea.Width()))
 	if m.isModelsListWin {
 		c = nil
 	} else if c != nil {
+		c.X += lipgloss.Width(textareaPrompt)
 		if textareaSectionIndex > 0 {
 			c.Y += lipgloss.Height(strings.Join(sections[:textareaSectionIndex], "\n"))
 		}
@@ -777,6 +801,12 @@ func (m model) handleModelsListInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		updatedModel, cmd := m.listModels.Update(msg)
 		m.listModels = updatedModel.(components.ModelModelsList)
 		return m, cmd
+	case "right":
+		m.listModels.NextPage()
+		return m, nil
+	case "left":
+		m.listModels.PrevPage()
+		return m, nil
 	default:
 		var cmd tea.Cmd
 		m.textarea, cmd = m.textarea.Update(msg)

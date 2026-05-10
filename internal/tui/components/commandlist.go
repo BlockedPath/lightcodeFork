@@ -166,8 +166,10 @@ func (m ModelCmdList) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var cmd tea.Cmd
 			m.list, cmd = m.list.Update(msg)
 			return m, cmd
-			// case "default":
-			// return m, nil
+		case "right":
+			m.list.NextPage()
+		case "left":
+			m.list.PrevPage()
 		}
 	}
 	return m, nil
