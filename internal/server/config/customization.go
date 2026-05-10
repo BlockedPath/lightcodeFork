@@ -49,12 +49,17 @@ type AllModels struct {
 func CustomizationPath() (string, error) {
 	path := filepath.Join(Dir(), "config.json")
 	if _, err := os.Stat(path); os.IsNotExist(err) {
+		def_prov := getDefaultProviders()
 		bare := Customization{
-			Theme:        "light",
-			SkillsPath:   filepath.Join(Dir(), "skills"),
-			Port:         "8080",
-			Providers:    getDefaultProviders(),
-			CurrentModel: ResModel{},
+			Theme:      "light",
+			SkillsPath: filepath.Join(Dir(), "skills"),
+			Port:       "8080",
+			Providers:  getDefaultProviders(),
+			CurrentModel: ResModel{
+				Model:   def_prov[0].Models[0],
+				BaseUrl: def_prov[0].BaseUrl,
+				ApiKey:  "",
+			},
 		}
 		d, err := json.MarshalIndent(bare, "", " ")
 		if err != nil {

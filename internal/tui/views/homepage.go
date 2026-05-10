@@ -329,6 +329,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.syncLayout()
 				return m, nil
 			}
+			if len(m.textarea.Value()) > 0 {
+				m.textarea.Reset()
+				return m, nil
+			}
 			return m, tea.Sequence(tea.Printf("Resume session with lightcode -r %s", m.currentSession.ID), tea.Quit)
 		case "esc":
 			if m.islistCommandsWin {
