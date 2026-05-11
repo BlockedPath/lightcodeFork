@@ -3,7 +3,7 @@ package llm
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
+	"errors"
 
 	"github.com/Kartik-2239/lightcode/internal/server/config"
 	"github.com/Kartik-2239/lightcode/internal/server/prompt"
@@ -32,7 +32,14 @@ type Chat struct {
 
 func ApiCall(ctx context.Context, input string, chats []Chat, mode string, img_bytes [][]byte) (Response, error) {
 	var toolCalls []ToolCall
-	cur_model := config.GetCustomization().CurrentModel
+	cur_model, err := config.GetCurrentModel()
+	if err != nil {
+		return Response{
+			Text:             "Ran into an error while getting the model",
+			ToolCalls:        []ToolCall{},
+			CompleteResponse: nil,
+		}, err
+	}
 	client := openai.NewClient(option.WithAPIKey(cur_model.ApiKey), option.WithBaseURL(cur_model.BaseUrl))
 
 	var messages []openai.ChatCompletionMessageParamUnion
@@ -80,14 +87,6 @@ func ApiCall(ctx context.Context, input string, chats []Chat, mode string, img_b
 	if len(parts) > 0 {
 		messages = append(messages, openai.UserMessage(parts))
 	}
-	cur_model, err := config.GetCurrentModel()
-	if err != nil {
-		return Response{
-			Text:             "Ran into an error while getting the model",
-			ToolCalls:        []ToolCall{},
-			CompleteResponse: nil,
-		}, err
-	}
 	m := cur_model.Model
 
 	// if mode == "plan" {
@@ -102,15 +101,20 @@ func ApiCall(ctx context.Context, input string, chats []Chat, mode string, img_b
 		Tools:    tools.GetToolsForChat(),
 		Model:    m,
 	})
+
 	// }
 
 	if err != nil {
-		fmt.Println("Error", err)
-		return Response{
-			Text:             "Ran into an error while calling the LLM",
-			ToolCalls:        []ToolCall{},
-			CompleteResponse: nil,
-		}, err
+		// fmt.Println("Error", err)
+		var apierr *openai.Error
+		if errors.As(err, &apierr) {
+			return Response{
+				Text:             apierr.Message,
+				ToolCalls:        []ToolCall{},
+				CompleteResponse: nil,
+			}, err
+		}
+
 	}
 	if len(resp.Choices) == 0 {
 		return Response{

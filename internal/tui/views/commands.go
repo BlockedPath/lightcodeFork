@@ -31,7 +31,12 @@ func compactMemoryCmd(sessionID string) tea.Cmd {
 func CmdHandler(cmd string, m *model) tea.Cmd {
 	switch cmd {
 	case "/sessions":
-		m.sessions = client.ListSession()
+		sessions, err := client.ListSession()
+		if err != nil {
+			m.sessions = []models.Session{}
+		} else {
+			m.sessions = sessions
+		}
 		m.listSession.Refresh(m.sessions)
 		m.islistSessionWin = true
 		m.textarea.Reset()
@@ -44,7 +49,7 @@ func CmdHandler(cmd string, m *model) tea.Cmd {
 		return func() tea.Msg { return refreshSessionsMsg{} }
 
 	case "/export":
-		path, err := exportCurrentSessionMarkdown(m.currentSession)
+		path, err := exportCurrentSessionMarkdown(m, m.currentSession)
 		if err != nil {
 			appendCommandStatusMessage(m, fmt.Sprintf("Export failed: %s", err.Error()))
 			return nil
@@ -88,6 +93,7 @@ func CmdHandler(cmd string, m *model) tea.Cmd {
 func resetCurrentSession(m *model) {
 	m.currentSession = models.Session{ID: "", Title: "", Directory: "."}
 	m.messages = []models.Message{}
+	m.currentContextSize = 0
 	m.viewport.SetContent(renderMessages(m.messages, m.width))
 	m.textarea.Reset()
 	m.viewport.GotoBottom()
@@ -146,7 +152,7 @@ func openModelsList(m *model) {
 }
 
 func appendUsageMessage(m *model) {
-	usageContent := buildUsageContent(m.currentSession)
+	usageContent := buildUsageContent(m, m.currentSession)
 	m.messages = append(m.messages, models.Message{
 		SessionID: m.currentSession.ID,
 		Data:      models.EncodeMessageData(models.StoredMessageData{Role: "assistant", Content: usageContent}),
@@ -182,12 +188,16 @@ func appendDirMessage(m *model) {
 	m.syncLayout()
 }
 
-func buildUsageContent(session models.Session) string {
+func buildUsageContent(m *model, session models.Session) string {
 	if session.ID == "" {
 		return "## Session Usage\n\nNo active session selected."
 	}
 
-	sessionMessages := client.GetSessionData(session.ID)
+	sessionMessages, err := client.GetSessionData(session.ID)
+	if err != nil {
+		m.isError = true
+		m.errorMessage = "Unable to get usage data"
+	}
 	var promptTokens int64
 	var completionTokens int64
 	var totalTokens int64

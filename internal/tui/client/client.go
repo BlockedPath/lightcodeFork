@@ -6,9 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -29,18 +27,18 @@ func init() {
 	baseUrl = "http://localhost:" + port
 }
 
-func ListSession() []models.Session {
+func ListSession() ([]models.Session, error) {
 	resp, err := http.Get(baseUrl + "/list-sessions")
 	if err != nil {
-		fmt.Println(err.Error())
-		return nil
+		// fmt.Println(err.Error())
+		return []models.Session{}, err
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	var sessions []models.Session
 	json.Unmarshal(body, &sessions)
 	Reverse(sessions)
-	return sessions
+	return sessions, nil
 }
 
 func Reverse(arr []models.Session) []models.Session {
@@ -50,34 +48,34 @@ func Reverse(arr []models.Session) []models.Session {
 	return arr
 }
 
-func GetSessionData(session_id string) []models.Message {
+func GetSessionData(session_id string) ([]models.Message, error) {
 	resp, err := http.Get(baseUrl + "/get-session-data?session_id=" + url.QueryEscape(session_id))
 	if err != nil {
-		fmt.Println(err.Error())
-		return nil
+		// fmt.Println(err.Error())
+		return nil, err
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	var messages []models.Message
 	json.Unmarshal(body, &messages)
-	return messages
+	return messages, nil
 }
 
-func CreateSession(prompt string) string {
+func CreateSession(prompt string) (string, error) {
 	workingDirectory, err := os.Getwd()
 	if err != nil {
-		fmt.Println(err.Error())
-		return ""
+		// fmt.Println(err.Error())
+		return "", err
 	}
 	resp, err := http.Post(baseUrl+"/create-session?prompt="+url.QueryEscape(prompt)+"&working_directory="+url.QueryEscape(workingDirectory), "application/json", nil)
 	if err != nil {
-		fmt.Println(err.Error())
-		return ""
+		// fmt.Println(err.Error())
+		return "", err
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
-	fmt.Println(string(body))
-	return strings.TrimSpace(string(body))
+	// fmt.Println(string(body))
+	return strings.TrimSpace(string(body)), nil
 }
 
 func ChatCompletion(ctx context.Context, session_id string, prompt string, mode string, img_bytes [][]byte) chan models.StoredMessageData {
@@ -94,12 +92,12 @@ func ChatCompletion(ctx context.Context, session_id string, prompt string, mode 
 		url := baseUrl + "/chat-completion?session_id=" + url.QueryEscape(session_id) + "&prompt=" + url.QueryEscape(prompt) + "&mode=" + url.QueryEscape(mode)
 		req, err := http.NewRequestWithContext(ctx, "GET", url, bytes.NewReader(bodybytes))
 		if err != nil {
-			fmt.Println(err.Error())
+			// fmt.Println(err.Error())
 			return
 		}
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			fmt.Println(err.Error())
+			// fmt.Println(err.Error())
 			return
 		}
 		defer resp.Body.Close()
@@ -122,7 +120,7 @@ func ChatCompletion(ctx context.Context, session_id string, prompt string, mode 
 	return ch
 }
 
-func SendMessage(session_id string, message string, img_bytes [][]byte) models.Message {
+func SendMessage(session_id string, message string, img_bytes [][]byte) (models.Message, error) {
 	payload := map[string]interface{}{
 		"images": img_bytes,
 	}
@@ -132,45 +130,46 @@ func SendMessage(session_id string, message string, img_bytes [][]byte) models.M
 	}
 	resp, err := http.Post(baseUrl+"/send-message?session_id="+url.QueryEscape(session_id)+"&message="+url.QueryEscape(message), "application/json", bytes.NewReader(bodybytes))
 	if err != nil {
-		fmt.Println(err.Error())
-		return models.Message{}
+		// fmt.Println(err.Error())
+		return models.Message{}, err
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	var newMessage models.Message
 	json.Unmarshal(body, &newMessage)
-	return newMessage
+	return newMessage, nil
 }
 
-func DeleteSession(session_id string) {
+func DeleteSession(session_id string) error {
 	resp, err := http.Post(baseUrl+"/delete-session?session_id="+url.QueryEscape(session_id), "application/json", nil)
 	if err != nil {
-		fmt.Println(err.Error())
-		return
+		// fmt.Println(err.Error())
+		return err
 	}
 	defer resp.Body.Close()
 	io.ReadAll(resp.Body)
+	return nil
 	//body, _ := io.ReadAll(resp.Body)
 	// fmt.Println(string(body))
 }
 
-func GetCurrentTodoList(session_id string) []models.ToDo {
+func GetCurrentTodoList(session_id string) ([]models.ToDo, error) {
 	resp, err := http.Get(baseUrl + "/get-current-todo-list?session_id=" + url.QueryEscape(session_id))
 	if err != nil {
-		fmt.Println(err.Error())
-		return []models.ToDo{}
+		// fmt.Println(err.Error())
+		return []models.ToDo{}, err
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	var todoList []models.ToDo
 	json.Unmarshal(body, &todoList)
-	return todoList
+	return todoList, nil
 }
 
 func GetAvailableSkills(session_id string) []string {
 	resp, err := http.Get(baseUrl + "/get-available-skills?session_id=" + url.QueryEscape(session_id))
 	if err != nil {
-		fmt.Println(err.Error())
+		// fmt.Println(err.Error())
 		return []string{}
 	}
 	defer resp.Body.Close()
@@ -180,21 +179,21 @@ func GetAvailableSkills(session_id string) []string {
 	return skillsList
 }
 
-func GetContextSize(session_id string) int64 {
+func GetContextSize(session_id string) (int64, error) {
 	resp, err := http.Get(baseUrl + "/get-context-size?session_id=" + url.QueryEscape(session_id))
 	if err != nil {
-		log.Fatal(err)
+		return 0, err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		return 0, err
 	}
 	contextSize, err := strconv.ParseInt(string(body), 10, 64)
 	if err != nil {
-		log.Fatal(err)
+		return 0, err
 	}
-	return contextSize
+	return contextSize, nil
 }
 
 func CompactMemory(session_id string) (int64, error) {
@@ -224,19 +223,19 @@ func CompactMemory(session_id string) (int64, error) {
 func GetModels() ([]config.ResModel, []config.RecentModels, error) {
 	resp, err := http.Get(baseUrl + "/get-models")
 	if err != nil {
-		log.Fatal(err)
+		// log.Fatal(err)
 		return []config.ResModel{}, []config.RecentModels{}, err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		// log.Fatal(err)
 		return []config.ResModel{}, []config.RecentModels{}, err
 	}
 	var modelsList config.AllModels
 	err = json.Unmarshal(body, &modelsList)
 	if err != nil {
-		log.Fatal(err)
+		// log.Fatal(err)
 		return []config.ResModel{}, []config.RecentModels{}, err
 	}
 	return modelsList.Models, modelsList.RecentModels, nil
@@ -244,19 +243,19 @@ func GetModels() ([]config.ResModel, []config.RecentModels, error) {
 func GetCurrentModel() (config.ResModel, error) {
 	resp, err := http.Get(baseUrl + "/get-current-model")
 	if err != nil {
-		log.Fatal(err)
+		// log.Fatal(err)
 		return config.ResModel{}, err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		// log.Fatal(err)
 		return config.ResModel{}, err
 	}
 	var cur_model config.ResModel
 	err = json.Unmarshal(body, &cur_model)
 	if err != nil {
-		log.Fatal(err)
+		// log.Fatal(err)
 		return config.ResModel{}, err
 	}
 	return cur_model, nil
@@ -264,17 +263,17 @@ func GetCurrentModel() (config.ResModel, error) {
 
 func SetApiKey(m config.ResModel, apikey string) error {
 	body := struct {
-		Api_key string
-		model   config.ResModel
+		ApiKey string          `json:"api_key"`
+		Model  config.ResModel `json:"model"`
 	}{
-		Api_key: apikey,
-		model:   m,
+		ApiKey: apikey,
+		Model:  m,
 	}
 	bytess, err := json.Marshal(body)
 	if err != nil {
-
+		return err
 	}
-	_, err = http.Post(baseUrl+"/get-current-model", "application/json", bytes.NewReader(bytess))
+	_, err = http.Post(baseUrl+"/set-api-key", "application/json", bytes.NewReader(bytess))
 	if err != nil {
 		return err
 	}
@@ -284,7 +283,7 @@ func SetApiKey(m config.ResModel, apikey string) error {
 func SetCurrentModel(m config.ResModel) error {
 	bodybytes, err := json.Marshal(m)
 	if err != nil {
-
+		return err
 	}
 	_, err = http.Post(baseUrl+"/set-current-model", "application/json", bytes.NewReader(bodybytes))
 	if err != nil {

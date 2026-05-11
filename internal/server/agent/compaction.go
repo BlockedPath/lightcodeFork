@@ -54,7 +54,10 @@ func CompactMemory(chats []llm.Chat) (models.StoredMessageData, error) {
 
 func apiCall(chats []llm.Chat) (string, error) {
 	ctx := context.Background()
-	cur_model := config.GetCustomization().CurrentModel
+	cur_model, err := config.GetCurrentModel()
+	if err != nil {
+		return "", err
+	}
 	client := openai.NewClient(option.WithAPIKey(cur_model.ApiKey), option.WithBaseURL(cur_model.BaseUrl))
 
 	var messages []openai.ChatCompletionMessageParamUnion
@@ -73,10 +76,6 @@ func apiCall(chats []llm.Chat) (string, error) {
 		}
 	}
 	messages = append(messages, openai.UserMessage(COMPACTION_PROMPT))
-	cur_model, err := config.GetCurrentModel()
-	if err != nil {
-		return "", err
-	}
 	m := cur_model.Model
 
 	resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{

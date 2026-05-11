@@ -98,6 +98,8 @@ type model struct {
 	queue              []queue
 	currentContextSize int64
 	enter_api_win      bool
+	isError            bool
+	errorMessage       string
 }
 
 func initialModel() model {
@@ -142,7 +144,11 @@ func initialModel() model {
 	vp.KeyMap.Right.SetEnabled(false)
 
 	ta.KeyMap.InsertNewline.SetEnabled(false)
-	sessions := client.ListSession()
+	sessions, err := client.ListSession()
+	if err != nil {
+		fmt.Println("Error listing sessions")
+		os.Exit(1)
+	}
 	sessionItems := make([]list.Item, len(sessions))
 	for i, s := range sessions {
 		sessionItems[i] = components.NewItem(s.Title, s.Directory)
@@ -238,6 +244,9 @@ func (m *model) syncLayout() {
 	if m.bashMode {
 		reservedHeight++
 	}
+	if m.isError {
+		reservedHeight++
+	}
 	if m.questionMode {
 		reservedHeight += m.questionUIHeight()
 	}
@@ -247,7 +256,9 @@ func (m *model) syncLayout() {
 	// for textarea border
 	reservedHeight += 2
 	// for dir above textarea
-	reservedHeight += 1
+	if strings.TrimSpace(m.currentSession.Directory) != "." || strings.TrimSpace(m.currentSession.Directory) != "" {
+		reservedHeight += 1
+	}
 
 	viewportHeight := m.height - reservedHeight
 	if viewportHeight < 1 {
@@ -300,10 +311,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, cmd
 				}
 				m.currentSession = m.sessions[curIdx]
-				m.messages = client.GetSessionData(m.currentSession.ID)
-				m.todoList = client.GetCurrentTodoList(m.currentSession.ID)
+				sessionData, err := client.GetSessionData(m.currentSession.ID)
+				if err != nil {
+					fmt.Println("Failed to get session data.")
+					os.Exit(1)
+				}
+				m.messages = sessionData
+				//m.todoList = client.GetCurrentTodoList(m.currentSession.ID)
 				m.islistSessionWin = false
-				m.currentContextSize = client.GetContextSize(m.currentSession.ID)
+				contextSize, err := client.GetContextSize(m.currentSession.ID)
+				if err != nil {
+					m.currentContextSize = 0
+				} else {
+					m.currentContextSize = contextSize
+				}
+
 				m.syncLayout()
 				m.viewport.SetContent(renderMessages(m.messages, m.width))
 				m.viewport.GotoBottom()
@@ -556,6 +578,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case streamMessageMsg:
 		if msg.Role == "error" {
+			m.isGenerating = false
+			m.isError = true
+			m.errorMessage = msg.Content
 			return m, nil
 		}
 		m.messages = append(m.messages, models.Message{
@@ -592,8 +617,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case streamDoneMsg:
 		m.streamCh = nil
 		m.isGenerating = false
+		m.syncLayout()
 		if m.currentSession.ID != "" {
-			m.todoList = client.GetCurrentTodoList(m.currentSession.ID)
+			// m.todoList = client.GetCurrentTodoList(m.currentSession.ID)
 			m.messages = withoutEphemeralTodoStatus(m.messages)
 			if len(m.todoList) != 0 {
 				m.messages = append(m.messages, models.Message{
@@ -609,7 +635,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, m.runNextQueuedPrompt()
 			}
 			if len(m.queue) == 0 {
-				m.currentContextSize = client.GetContextSize(m.currentSession.ID)
+				contextSize, err := client.GetContextSize(m.currentSession.ID)
+				if err != nil {
+					m.currentContextSize = 0
+				} else {
+					m.currentContextSize = contextSize
+				}
+				m.syncLayout()
 				return m, nil
 			}
 
@@ -630,7 +662,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.currentSession.ID != msg.sessionID {
 			return m, nil
 		}
-		m.messages = client.GetSessionData(m.currentSession.ID)
+		messages, err := client.GetSessionData(m.currentSession.ID)
+		if err != nil {
+			fmt.Println("Failed to get session data")
+			os.Exit(1)
+		}
+		m.messages = messages
 		m.currentContextSize = msg.contextSize
 		m.messages = append(m.messages, models.Message{
 			SessionID: m.currentSession.ID,
@@ -680,10 +717,18 @@ func (m model) View() tea.View {
 	}
 
 	// sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Render(shortenDir(m.currentSession.Directory)))
+	if m.isError {
+		sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.BrightRed).Render(m.errorMessage))
+		m.isError = false
+	}
+
 	if m.enter_api_win {
 		sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.BrightRed).Render("enter api key for "+m.listModels.Current().Model))
 	} else {
-		sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Render(shortenDir(m.currentSession.Directory)))
+		shortenedDir := shortenDir(m.currentSession.Directory)
+		if shortenedDir != "." {
+			sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Render(shortenedDir))
+		}
 	}
 
 	sections = append(sections, lipgloss.NewStyle().Render(strings.Repeat("—", m.width)))

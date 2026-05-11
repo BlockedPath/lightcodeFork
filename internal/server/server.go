@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"net/http"
@@ -60,7 +59,7 @@ func Initialise(ready chan<- struct{}, port string, isDebug bool) {
 			return
 			// close(ready)
 		}
-		log.Fatal(err)
+		// log.Fatal(err)
 	}
 	close(ready)
 
@@ -230,14 +229,14 @@ func getModels(w http.ResponseWriter, r *http.Request) {
 
 func setApiKey(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Api_key string
-		model   config.ResModel
+		ApiKey string          `json:"api_key"`
+		Model  config.ResModel `json:"model"`
 	}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	err = config.SetApiKey(req.model, req.Api_key)
+	err = config.SetApiKey(req.Model, req.ApiKey)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

@@ -18,9 +18,9 @@ type clearEscMsgMsg struct{}
 func waitForMessages(ch chan models.StoredMessageData) tea.Cmd {
 	return func() tea.Msg {
 		msg, ok := <-ch
-		if msg.Role == "error" {
-			return streamDoneMsg{}
-		}
+		// if msg.Role == "error" {
+		// 	return streamDoneMsg{}
+		// }
 		if !ok {
 			return streamDoneMsg{}
 		}
@@ -45,7 +45,10 @@ func (m *model) ensureCurrentSession(prompt string) {
 	}
 	dir, _ := os.Getwd()
 	home, _ := os.UserHomeDir()
-	sessionID := client.CreateSession(prompt)
+	sessionID, err := client.CreateSession(prompt)
+	if err != nil {
+		return
+	}
 	m.currentSession = models.Session{ID: sessionID, Title: prompt, Directory: strings.Replace(dir, home, "~", 1)}
 	client.Reverse(m.sessions)
 	m.sessions = append(m.sessions, m.currentSession)
@@ -53,6 +56,11 @@ func (m *model) ensureCurrentSession(prompt string) {
 	m.listSession.Refresh(m.sessions)
 }
 
+func streamError() tea.Cmd {
+	return func() tea.Msg {
+		return streamDoneMsg{}
+	}
+}
 func (m *model) beginGeneration(prompt string) tea.Cmd {
 	m.isGenerating = true
 	m.syncLayout()
@@ -60,8 +68,14 @@ func (m *model) beginGeneration(prompt string) tea.Cmd {
 	textareaValue, img_bytes := createPrompt(strings.Trim(prompt, "\n"), m)
 	m.clearPastedInput()
 	m.syncLayout()
-	newMessage := client.SendMessage(m.currentSession.ID, textareaValue, img_bytes)
-	m.messages = append(m.messages, newMessage)
+	newMessage, err := client.SendMessage(m.currentSession.ID, textareaValue, img_bytes)
+	if err != nil {
+		m.isError = true
+		m.errorMessage = "Unable to send a message"
+		return streamError()
+	} else {
+		m.messages = append(m.messages, newMessage)
+	}
 	m.refreshMessagesView()
 
 	ctx, cancel := context.WithCancel(context.Background())

@@ -128,9 +128,17 @@ func SetApiKey(m ResModel, apikey string) error {
 			customization.Providers[i].ApiKey = apikey
 		}
 	}
+	if customization.CurrentModel.BaseUrl == m.BaseUrl {
+		customization.CurrentModel.ApiKey = apikey
+	}
+	for i := range customization.RecentModels {
+		if customization.RecentModels[i].BaseUrl == m.BaseUrl {
+			customization.RecentModels[i].ApiKey = apikey
+		}
+	}
 	d, err := json.MarshalIndent(customization, "", " ")
 	if err != nil {
-		return errors.New("Error Setting api keyl")
+		return errors.New("Error Setting api key")
 	}
 	path, err := CustomizationPath()
 	if err != nil {
@@ -187,17 +195,22 @@ func SetCurrentModel(model ResModel) error {
 }
 
 func GetCurrentModel() (ResModel, error) {
+	customization := GetCustomization()
+	if customization.CurrentModel.Model != "" {
+		return customization.CurrentModel, nil
+	}
 	models, recent_models, err := GetModels()
-	sort.Slice(recent_models, func(i, j int) bool {
-		return recent_models[i].LastUsed < recent_models[j].LastUsed
-	})
 	if err != nil {
 		return ResModel{}, err
 	}
+	sort.Slice(recent_models, func(i, j int) bool {
+		return recent_models[i].LastUsed > recent_models[j].LastUsed
+	})
 	if len(recent_models) > 0 {
 		r := recent_models[0]
 		return ResModel{Model: r.Model, ApiKey: r.ApiKey, BaseUrl: r.BaseUrl}, nil
-	} else {
+	} else if len(models) > 0 {
 		return models[0], nil
 	}
+	return ResModel{}, errors.New("no models configured")
 }

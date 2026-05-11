@@ -13,14 +13,23 @@ import (
 	"github.com/Kartik-2239/lightcode/internal/tui/client"
 )
 
-func exportCurrentSessionMarkdown(session models.Session) (string, error) {
+func exportCurrentSessionMarkdown(m *model, session models.Session) (string, error) {
 	if session.ID == "" {
 		return "", fmt.Errorf("no active session selected")
 	}
 
 	exportedAt := time.Now()
-	exportSession := loadSessionForExport(session)
-	messages := client.GetSessionData(session.ID)
+	exportSession, err := loadSessionForExport(session)
+	if err != nil {
+		m.isError = true
+		m.errorMessage = "Failed to export session"
+	}
+	sessionData, err := client.GetSessionData(session.ID)
+	if err != nil {
+		m.isError = true
+		m.errorMessage = "Failed to export session"
+	}
+	messages := sessionData
 	sort.SliceStable(messages, func(i, j int) bool {
 		if messages[i].TimeCreated == messages[j].TimeCreated {
 			return messages[i].ID < messages[j].ID
@@ -43,13 +52,17 @@ func exportCurrentSessionMarkdown(session models.Session) (string, error) {
 	return path, nil
 }
 
-func loadSessionForExport(session models.Session) models.Session {
-	for _, item := range client.ListSession() {
+func loadSessionForExport(session models.Session) (models.Session, error) {
+	sessions, err := client.ListSession()
+	if err != nil {
+		return models.Session{}, err
+	}
+	for _, item := range sessions {
 		if item.ID == session.ID {
-			return item
+			return item, nil
 		}
 	}
-	return session
+	return session, nil
 }
 
 func buildSessionExportMarkdown(session models.Session, messages []models.Message, exportedAt time.Time) string {
