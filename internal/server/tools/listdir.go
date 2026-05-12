@@ -1,30 +1,38 @@
 package tools
 
 import (
+	"fmt"
 	"os"
+	"path"
+	"strings"
 )
 
 func ListDir(ctx ToolContext, args map[string]any) (ToolResponse, error) {
-	path, ok := args["path"].(string)
+	path_, ok := args["path"].(string)
 	if !ok {
 		return ToolResponse{Content: "Error: path is required and must be a string"}, nil
 	}
-	resolved, err := ValidatePath(ctx, path)
+	resolved, err := ValidatePath(ctx, path_)
 	if err != nil {
 		return ToolResponse{Content: "Error: " + err.Error()}, nil
 	}
-	path = resolved
-	entries, err := os.ReadDir(path)
+	path_ = resolved
+	entries, err := os.ReadDir(path_)
 	if err != nil {
 		return ToolResponse{Content: "Error: " + err.Error()}, err
 	}
 
 	var result string
 	for _, e := range entries {
+		v, _ := e.Info()
 		if e.IsDir() {
-			result += e.Name() + "/\n"
+			result += fmt.Sprintf("dir '%s/' %v bytes\n", e.Name(), v.Size())
 		} else {
-			result += e.Name() + "\n"
+			data, err := os.ReadFile(path.Join(path_, e.Name()))
+			if err == nil {
+				lines := len(strings.Split(string(data), "\n"))
+				result += fmt.Sprintf("file: '%s' | size: %v kb | lines: %d\n", e.Name(), v.Size()/1000, lines)
+			}
 		}
 	}
 	return ToolResponse{Content: result}, nil

@@ -86,12 +86,16 @@ func formatToolResult(content string, codeChanges []string, width int, tc models
 	}
 	if len(codeChanges) == 0 {
 		lines := strings.Split(content, "\n")
-		if len(lines) <= 4 {
-			home, _ := os.UserHomeDir()
-			content = strings.Replace(content, home, "~", 1)
-			return styleResultText.Render(content)
+		home, _ := os.UserHomeDir()
+		var content string
+		if len(lines) >= 8 {
+			req := append(lines[:8], fmt.Sprintf("...%d more lines", len(lines)-8))
+			content = strings.Replace(strings.Join(req, "\n"), home, "~", 0)
+		} else {
+			content = strings.Replace(strings.Join(lines, "\n"), home, "~", 0)
 		}
-		return styleTree.Render(lines[0]+"\n") + styleTree.PaddingLeft(3).Render(strings.Join(lines[1:4], "\n")+"\n...")
+
+		return styleTree.Render(lines[0]+"\n") + styleTree.PaddingLeft(3).Render(content) //+"\n...")
 	}
 
 	var sb strings.Builder

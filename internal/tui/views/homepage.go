@@ -63,6 +63,7 @@ type model struct {
 	sessions           []models.Session
 	currentSession     models.Session
 	messages           []models.Message
+	completeMessages   []models.Message
 	textarea           textarea.Model
 	pasteCounter       int
 	pastedTexts        map[int]string
@@ -235,9 +236,6 @@ func (m *model) syncLayout() {
 	if len(m.queue) > 0 {
 		reservedHeight += len(m.queue) + 1
 	}
-	if m.islistCommandsWin {
-		reservedHeight += m.listCommands.Height()
-	}
 	if previews, ok := m.currentKittyPreview(); ok {
 		reservedHeight += previews[0].rows
 	}
@@ -249,6 +247,10 @@ func (m *model) syncLayout() {
 	}
 	if m.questionMode {
 		reservedHeight += m.questionUIHeight()
+	}
+
+	if m.islistCommandsWin {
+		reservedHeight += m.listCommands.Height()
 	}
 	if m.isModelsListWin {
 		reservedHeight += m.listModels.Height()
@@ -316,7 +318,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					fmt.Println("Failed to get session data.")
 					os.Exit(1)
 				}
-				m.messages = sessionData
+				if len(sessionData) > 100 {
+					m.messages = sessionData[len(sessionData)-100:]
+				} else {
+					m.messages = sessionData
+				}
+				m.completeMessages = sessionData
+
 				//m.todoList = client.GetCurrentTodoList(m.currentSession.ID)
 				m.islistSessionWin = false
 				contextSize, err := client.GetContextSize(m.currentSession.ID)
@@ -484,8 +492,36 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.listCommands = updatedModel.(components.ModelCmdList)
 				return m, cmd
 			}
+
 			var cmd tea.Cmd
+			if len(m.completeMessages) > 100 && len(m.messages) > 0 {
+				curStart := len(m.completeMessages) - len(m.messages)
+				for i := range m.completeMessages {
+					if m.completeMessages[i].ID == m.messages[0].ID {
+						curStart = i
+						break
+					}
+				}
+				size := 75
+				step := 35
+				top_offset := 15
+				if msg.String() == "up" && m.viewport.YOffset() < top_offset && curStart > 0 {
+					targetIdx := max(0, curStart-step)
+					addedLines := strings.Count(renderMessages(m.completeMessages[targetIdx:curStart], m.width), "\n") - strings.Count(mascot(), "\n")
+					m.messages = m.completeMessages[targetIdx:min(targetIdx+size, len(m.completeMessages))]
+					m.viewport.SetContent(renderMessages(m.messages, m.width))
+					m.viewport.SetYOffset(m.viewport.YOffset() + addedLines)
+				} else if msg.String() == "down" && m.viewport.TotalLineCount()-(m.viewport.YOffset()+m.viewport.VisibleLineCount()) < top_offset && curStart+len(m.messages) < len(m.completeMessages) {
+					targetIdx := min(curStart+step, len(m.completeMessages)-size)
+					removedLines := strings.Count(renderMessages(m.completeMessages[curStart:targetIdx], m.width), "\n") - strings.Count(mascot(), "\n")
+					m.messages = m.completeMessages[targetIdx:min(targetIdx+size, len(m.completeMessages))]
+					m.viewport.SetContent(renderMessages(m.messages, m.width))
+					m.viewport.SetYOffset(max(0, m.viewport.YOffset()-removedLines))
+				}
+			}
+
 			m.viewport, cmd = m.viewport.Update(msg)
+
 			return m, cmd
 		case "tab":
 			for i, v := range m.modes {
@@ -497,6 +533,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "/":
+			m.listCommands.Reset()
 			if m.islistCommandsWin {
 				m.cache[m.cacheIndex] = m.textarea.Value()
 				var cmd tea.Cmd
@@ -548,9 +585,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseWheelMsg:
 		switch msg.Button {
 		case tea.MouseWheelUp:
-			m.viewport.SetYOffset(m.viewport.YOffset() - 2)
+			m.viewport.SetYOffset(m.viewport.YOffset() - 1)
 		case tea.MouseWheelDown:
-			m.viewport.SetYOffset(m.viewport.YOffset() + 2)
+			m.viewport.SetYOffset(m.viewport.YOffset() + 1)
 		}
 		m.syncLayout()
 	case tea.MouseClickMsg:
@@ -558,9 +595,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.MouseLeft:
 		case tea.MouseRight:
 		}
-	case tea.MouseReleaseMsg:
-		// msg.Button, msg.
-	case tea.MouseMotionMsg:
+	// case tea.MouseReleaseMsg:
+
+	// case tea.MouseMotionMsg:
 
 	case spinner.TickMsg:
 		if !m.isGenerating && !m.isCompacting {
@@ -737,20 +774,27 @@ func (m model) View() tea.View {
 	sections = append(sections, lipgloss.JoinHorizontal(lipgloss.Top, textareaPrompt, m.textareaView()))
 	sections = append(sections, lipgloss.NewStyle().Render(strings.Repeat("—", m.width)))
 
-	if !m.islistCommandsWin && !m.isModelsListWin {
-		// mode and model name
-		s := strings.ToUpper(m.mode[:1]) + m.mode[1:] + " "
-		model_name := m.modelsList[m.modelsListIndex].Model
-
-		mode := lipgloss.NewStyle().Foreground(lipgloss.BrightMagenta).Bold(true).Render(s)
-		modelName := lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Bold(false).Render(model_name)
-
-		formatted_context := FormatK(m.currentContextSize) + " (" + strconv.FormatFloat(float64(m.currentContextSize)/1280, 'f', 1, 64) + "%)"
-
-		contextSize := lipgloss.NewStyle().Align(lipgloss.Right).Foreground(lipgloss.BrightMagenta).Width(m.width - len(s) - len(model_name)).Render(formatted_context)
-
-		sections = append(sections, lipgloss.JoinHorizontal(lipgloss.Bottom, mode, modelName, contextSize))
+	if m.islistCommandsWin {
+		sections = append(sections, m.listCommands.StringView())
 	}
+	if m.isModelsListWin {
+		sections = append(sections, m.listModels.StringView())
+	}
+
+	// mode and model name
+	// if !m.islistCommandsWin && !m.isModelsListWin {
+	s := strings.ToUpper(m.mode[:1]) + m.mode[1:] + " "
+	model_name := m.modelsList[m.modelsListIndex].Model
+
+	mode := lipgloss.NewStyle().Foreground(lipgloss.BrightMagenta).Bold(true).Render(s)
+	modelName := lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Bold(false).Render(model_name)
+
+	formatted_context := FormatK(m.currentContextSize) + " (" + strconv.FormatFloat(float64(m.currentContextSize)/1280, 'f', 1, 64) + "%)"
+
+	contextSize := lipgloss.NewStyle().Align(lipgloss.Right).Foreground(lipgloss.BrightMagenta).Width(m.width - len(s) - len(model_name)).Render(formatted_context)
+
+	sections = append(sections, lipgloss.JoinHorizontal(lipgloss.Bottom, mode, modelName, contextSize))
+	// }
 
 	if m.isGenerating || m.isCompacting {
 		if m.showEscMsg {
@@ -760,13 +804,6 @@ func (m model) View() tea.View {
 		} else {
 			sections = append(sections, m.spinner.View()+" Generating...")
 		}
-	}
-
-	if m.islistCommandsWin {
-		sections = append(sections, m.listCommands.StringView())
-	}
-	if m.isModelsListWin {
-		sections = append(sections, m.listModels.StringView())
 	}
 
 	v := tea.NewView(strings.Join(sections, "\n"))

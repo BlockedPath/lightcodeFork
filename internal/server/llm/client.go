@@ -114,6 +114,7 @@ func ApiCall(ctx context.Context, input string, chats []Chat, mode string, img_b
 				CompleteResponse: nil,
 			}, err
 		}
+		return Response{Text: "Internal Error: " + err.Error()}, err
 
 	}
 	if len(resp.Choices) == 0 {

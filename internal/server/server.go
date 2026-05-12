@@ -76,8 +76,8 @@ func listSessions(w http.ResponseWriter, r *http.Request) {
 func getSessionData(w http.ResponseWriter, r *http.Request) {
 	var messages []models.Message
 	session_id := r.URL.Query().Get("session_id")
-	DB.Table("messages").Select("*").Where("session_id = ?", session_id).Find(&messages)
-	// fmt.Println(messages)
+	DB.Table("messages").Select("*").Where("session_id = ?", session_id).Limit(1000).Find(&messages)
+	fmt.Println("Number of messages: ", len(messages))
 	json.NewEncoder(w).Encode(messages)
 }
 

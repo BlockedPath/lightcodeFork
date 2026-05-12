@@ -93,6 +93,7 @@ func CmdHandler(cmd string, m *model) tea.Cmd {
 func resetCurrentSession(m *model) {
 	m.currentSession = models.Session{ID: "", Title: "", Directory: "."}
 	m.messages = []models.Message{}
+	m.completeMessages = []models.Message{}
 	m.currentContextSize = 0
 	m.viewport.SetContent(renderMessages(m.messages, m.width))
 	m.textarea.Reset()

@@ -139,6 +139,7 @@ func (m *ModelCmdList) Filter(term string) {
 			filtered = append(filtered, i)
 		}
 	}
+	m.list.ResetSelected()
 	m.list.SetItems(filtered)
 }
 
@@ -193,6 +194,10 @@ func (m ModelCmdList) Current() string {
 		return ""
 	}
 	return it.name
+}
+
+func (m ModelCmdList) Reset() {
+	m.list.ResetSelected()
 }
 
 func (m ModelCmdList) Height() int {

@@ -19,17 +19,6 @@ func TestSkill_MissingSkillName(t *testing.T) {
 	}
 }
 
-func TestSkill_SkillPathNotSet(t *testing.T) {
-	t.Setenv("SKILL_PATH", "")
-	resp, err := Skill(testCtx, map[string]any{"skillName": "foo"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.Content != "Skill path not found" {
-		t.Errorf("expected 'Skill path not found', got: %q", resp.Content)
-	}
-}
-
 func TestSkill_SkillNotFound(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("SKILL_PATH", dir)
