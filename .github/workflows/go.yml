@@ -15,29 +15,30 @@ jobs:
         include:
           - goos: linux
             goarch: amd64
+            runner: ubuntu-latest
             binary: lightcode-linux-amd64
 
           - goos: linux
             goarch: arm64
+            runner: ubuntu-latest
             binary: lightcode-linux-arm64
 
           - goos: darwin
             goarch: amd64
+            runner: macos-latest
             binary: lightcode-darwin-amd64
 
           - goos: darwin
             goarch: arm64
+            runner: macos-latest
             binary: lightcode-darwin-arm64
 
           - goos: windows
             goarch: amd64
+            runner: windows-latest
             binary: lightcode-windows-amd64.exe
 
-          - goos: windows
-            goarch: arm64
-            binary: lightcode-windows-arm64.exe
-
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - uses: actions/checkout@v6
@@ -50,6 +51,12 @@ jobs:
 
       - name: Create dist directory
         run: mkdir -p dist
+
+      - name: Install Linux dependencies
+        if: matrix.goos == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev
 
       - name: Build
         run: |
