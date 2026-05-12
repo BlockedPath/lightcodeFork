@@ -60,9 +60,9 @@ jobs:
 
       - name: Build
         run: go build -v -o dist/${{ matrix.binary }} ./cmd/lightcode
-        env: 
-          GOOS=${{ matrix.goos }} \
-          GOARCH=${{ matrix.goarch }} \
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v5
