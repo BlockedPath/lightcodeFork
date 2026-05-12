@@ -24,6 +24,7 @@ import (
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
 	"github.com/Kartik-2239/lightcode/internal/tui/client"
 	"github.com/Kartik-2239/lightcode/internal/tui/components"
+	"github.com/aymanbagabas/go-nativeclipboard"
 	"github.com/charmbracelet/x/term"
 	"golang.design/x/clipboard"
 )
@@ -389,8 +390,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err != nil {
 				panic(err)
 			}
-			textBytes := clipboard.Read(clipboard.FmtText)
-			imgBytes := clipboard.Read(clipboard.FmtImage)
+			// textBytes := clipboard.Read(clipboard.FmtText)
+			// imgBytes := clipboard.Read(clipboard.FmtImage)
+			textBytes, _ := nativeclipboard.Text.Read()
+			imgBytes, _ := nativeclipboard.Image.Read()
+			// if textErr != nil || imgErr != nil {
+			// 	fmt.Println(textErr)
+			// 	fmt.Println("===========================")
+			// 	fmt.Println(imgErr)
+			// }
 			nextVal := curVal
 			var cmd tea.Cmd
 			if imgBytes != nil {
