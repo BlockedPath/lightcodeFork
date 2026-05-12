@@ -23,6 +23,7 @@ jobs:
             runner: ubuntu-24.04-arm
             binary: lightcode-linux-arm64
 
+          # can't find a runner immediately...duh(idk how long to wait)
           # - goos: darwin
           #   goarch: amd64
           #   runner: macos-13
@@ -38,10 +39,11 @@ jobs:
             runner: windows-latest
             binary: lightcode-windows-amd64.exe
           
-          - goos: windows
-            goarch: arm64
-            runner: windows-arm64-latest
-            binary: lightcode-windows-amd64.exe
+          # can't find a runner immediately (idk how long to wait) 
+          # - goos: windows
+          #   goarch: arm64
+          #   runner: windows-arm64-latest
+          #   binary: lightcode-windows-amd64.exe
 
     runs-on: ${{ matrix.runner }}
 
