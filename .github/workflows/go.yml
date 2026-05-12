@@ -35,7 +35,7 @@ jobs:
 
           - goos: windows
             goarch: amd64
-            runner: windows-latest
+            runner: ubuntu-latest
             binary: lightcode-windows-amd64.exe
 
     runs-on: ${{ matrix.runner }}
@@ -59,10 +59,10 @@ jobs:
           sudo apt-get install -y libx11-dev
 
       - name: Build
-        run: |
+        run: go build -v -o dist/${{ matrix.binary }} ./cmd/lightcode
+        env: 
           GOOS=${{ matrix.goos }} \
           GOARCH=${{ matrix.goarch }} \
-          go build -v -o dist/${{ matrix.binary }} ./cmd/lightcode
 
       - name: Upload artifact
         uses: actions/upload-artifact@v5
