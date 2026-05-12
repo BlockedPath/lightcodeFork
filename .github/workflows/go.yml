@@ -18,10 +18,10 @@ jobs:
             runner: ubuntu-latest
             binary: lightcode-linux-amd64
 
-          - goos: linux
-            goarch: arm64
-            runner: ubuntu-latest
-            binary: lightcode-linux-arm64
+          # - goos: linux
+          #   goarch: arm64
+          #   runner: ubuntu-latest
+          #   binary: lightcode-linux-arm64
 
           - goos: darwin
             goarch: amd64
