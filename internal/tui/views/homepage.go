@@ -392,13 +392,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			// textBytes := clipboard.Read(clipboard.FmtText)
 			// imgBytes := clipboard.Read(clipboard.FmtImage)
-			textBytes, _ := nativeclipboard.Text.Read()
-			imgBytes, _ := nativeclipboard.Image.Read()
-			// if textErr != nil || imgErr != nil {
-			// 	fmt.Println(textErr)
-			// 	fmt.Println("===========================")
-			// 	fmt.Println(imgErr)
-			// }
+			textBytes, textErr := nativeclipboard.Text.Read()
+			imgBytes, imgErr := nativeclipboard.Image.Read()
+			if textErr != nil && imgErr != nil {
+				m.isError = true
+				m.errorMessage = textErr.Error() + imgErr.Error()
+				return m, nil
+			}
 			nextVal := curVal
 			var cmd tea.Cmd
 			if imgBytes != nil {
