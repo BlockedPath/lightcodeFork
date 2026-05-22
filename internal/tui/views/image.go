@@ -109,7 +109,7 @@ func renderKittyPlaceholders(imgID, cols, rows int) string {
 
 	var buf strings.Builder
 	for y := range rows {
-		for x := 0; x < cols; x++ {
+		for x := range cols {
 			buf.WriteString(fgStyle)
 			buf.WriteRune(kitty.Placeholder)
 			buf.WriteRune(kitty.Diacritic(y))

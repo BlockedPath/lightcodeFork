@@ -7,7 +7,7 @@ import (
 
 	"github.com/Kartik-2239/lightcode/internal/server/config"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
-	"github.com/Kartik-2239/lightcode/internal/server/llm"
+	"github.com/Kartik-2239/lightcode/internal/server/llm/llmModel"
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 )
@@ -37,7 +37,7 @@ func predictTokenCount(messages []models.Message, i int) int64 {
 	return last_assistant_tokens + int64(len(models.DecodeMessageData(messages[i].Data).Content)/4)
 }
 
-func CompactMemory(chats []llm.Chat) (models.StoredMessageData, error) {
+func CompactMemory(chats []llmModel.Chat) (models.StoredMessageData, error) {
 	summary, err := apiCall(chats)
 	if err != nil {
 		return models.StoredMessageData{}, err
@@ -52,7 +52,7 @@ func CompactMemory(chats []llm.Chat) (models.StoredMessageData, error) {
 	return compactedMemory, nil
 }
 
-func apiCall(chats []llm.Chat) (string, error) {
+func apiCall(chats []llmModel.Chat) (string, error) {
 	ctx := context.Background()
 	cur_model, err := config.GetCurrentModel()
 	if err != nil {

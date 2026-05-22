@@ -16,6 +16,15 @@ func SkillsPath() string {
 	return GetCustomization().SkillsPath
 }
 
+func GetAuthPath() (string, error) {
+	path := filepath.Join(Dir(), "auth.json")
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return "", err
+	}
+	return path, nil
+
+}
+
 func DBPath() string {
 	return filepath.Join(Dir(), "lightcode.db")
 }

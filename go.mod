@@ -7,6 +7,7 @@ require (
 	charm.land/bubbletea/v2 v2.0.0
 	charm.land/glamour/v2 v2.0.0
 	charm.land/lipgloss/v2 v2.0.0
+	github.com/aymanbagabas/go-nativeclipboard v0.1.3
 	github.com/charmbracelet/x/ansi v0.11.6
 	github.com/charmbracelet/x/term v0.2.2
 	github.com/openai/openai-go/v3 v3.24.0
@@ -16,7 +17,6 @@ require (
 )
 
 require (
-	github.com/aymanbagabas/go-nativeclipboard v0.1.3 // indirect
 	github.com/ebitengine/purego v0.10.0-alpha.4 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 )

@@ -9,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/Kartik-2239/lightcode/internal/server/api"
 	"github.com/Kartik-2239/lightcode/internal/server/config"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
 	"github.com/Kartik-2239/lightcode/internal/tui/client"
@@ -117,21 +118,17 @@ type item config.ResModel
 
 func (i item) FilterValue() string { return i.Model }
 
-func loadModelsList() ([]config.ResModel, error) {
+func loadModelsList() ([]api.ModelInfo, error) {
 	modelsList, recentModels, err := client.GetModels()
 	if err != nil {
-		return []config.ResModel{}, err
+		return []api.ModelInfo{}, err
 	}
 
 	sort.Slice(recentModels, func(i, j int) bool {
 		return recentModels[i].LastUsed < recentModels[j].LastUsed
 	})
 	for _, recentModel := range recentModels {
-		modelsList = append(modelsList, config.ResModel{
-			Model:   recentModel.Model,
-			ApiKey:  recentModel.ApiKey,
-			BaseUrl: recentModel.BaseUrl,
-		})
+		modelsList = append(modelsList, recentModel)
 	}
 	slices.Reverse(modelsList)
 	return modelsList, nil
@@ -140,7 +137,7 @@ func loadModelsList() ([]config.ResModel, error) {
 func openModelsList(m *model) {
 	modelsList, err := loadModelsList()
 	if err != nil {
-		modelsList = []config.ResModel{}
+		modelsList = []api.ModelInfo{}
 	}
 	m.textarea.Reset()
 	m.modelsList = modelsList

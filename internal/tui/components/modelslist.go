@@ -8,12 +8,12 @@ import (
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/Kartik-2239/lightcode/internal/server/config"
+	"github.com/Kartik-2239/lightcode/internal/server/api"
 )
 
 const maxModelsListHeight = 5
 
-type modelItem config.ResModel
+type modelItem api.ModelInfo
 
 func (i modelItem) FilterValue() string { return i.Model }
 
@@ -30,7 +30,7 @@ func (d modelItemDelegate) Render(w io.Writer, m list.Model, index int, listItem
 		return
 	}
 
-	str := fmt.Sprintf("%s", i.Model)
+	str := fmt.Sprintf("%s", i.Model) + fmt.Sprintf(" (%s)", i.Provider)
 
 	fn := d.styles.item.Render
 	if index == m.Index() {
@@ -84,7 +84,7 @@ func (m *ModelModelsList) Filter(term string) {
 func (m *ModelModelsList) GetHeight() int {
 	return m.height
 }
-func (m *ModelModelsList) Refresh(items []config.ResModel) {
+func (m *ModelModelsList) Refresh(items []api.ModelInfo) {
 	listItems := make([]list.Item, len(items))
 	for i, model := range items {
 		listItems[i] = modelItem(model)
@@ -136,16 +136,16 @@ func (m ModelModelsList) PrevPage() {
 	m.list.PrevPage()
 }
 
-func (m ModelModelsList) Current() config.ResModel {
+func (m ModelModelsList) Current() api.ModelInfo {
 	selected := m.list.SelectedItem()
 	if selected == nil {
-		return config.ResModel{}
+		return api.ModelInfo{}
 	}
 	it, ok := selected.(modelItem)
 	if !ok {
-		return config.ResModel{}
+		return api.ModelInfo{}
 	}
-	return config.ResModel(it)
+	return api.ModelInfo(it)
 }
 
 func (m ModelModelsList) Height() int {

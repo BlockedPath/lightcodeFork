@@ -11,8 +11,8 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/Kartik-2239/lightcode/internal/server"
 	"github.com/Kartik-2239/lightcode/internal/server/agent"
+	"github.com/Kartik-2239/lightcode/internal/server/api"
 	"github.com/Kartik-2239/lightcode/internal/server/config"
 	"github.com/Kartik-2239/lightcode/internal/server/db"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
@@ -78,12 +78,12 @@ func Lightcode(isServer bool, isTui bool, isDebug bool) {
 		if err != nil {
 			if isServer && isTui {
 				ready := make(chan struct{})
-				go server.Initialise(ready, port, isDebug)
+				go api.Initialise(ready, port, isDebug)
 				<-ready
 			}
 			if isServer && !isTui {
 				ready := make(chan struct{})
-				server.Initialise(ready, port, isDebug)
+				api.Initialise(ready, port, isDebug)
 			}
 		}
 	}
@@ -108,7 +108,8 @@ func runAgent(prompt string) {
 	newMessage := models.Message{SessionID: session_id, Data: models.EncodeMessageData(models.StoredMessageData{Role: "user", Content: prompt})}
 
 	database.Create(&newMessage)
-	for result := range agent.New(database).Run(ctx, prompt, [][]byte{}, session_id, "chat", false) {
+	model := config.GetCustomization().CurrentModel
+	for result := range agent.New(database).Run(ctx, model, prompt, [][]byte{}, session_id, "chat", false) {
 		fmt.Println(result.Content)
 		for _, tool := range result.ToolCalls {
 			fmt.Printf("%s({%s})", tool.Name, tool.Arguments)

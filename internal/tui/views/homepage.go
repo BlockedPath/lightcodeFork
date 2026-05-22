@@ -20,7 +20,7 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/Kartik-2239/lightcode/internal/server/config"
+	"github.com/Kartik-2239/lightcode/internal/server/api"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
 	"github.com/Kartik-2239/lightcode/internal/tui/client"
 	"github.com/Kartik-2239/lightcode/internal/tui/components"
@@ -93,7 +93,7 @@ type model struct {
 	todoList           []models.ToDo
 	modes              []string
 	mode               string
-	modelsList         []config.ResModel
+	modelsList         []api.ModelInfo
 	isModelsListWin    bool
 	modelsListIndex    int
 	isCompacting       bool
@@ -162,7 +162,7 @@ func initialModel() model {
 
 	modelsList, err := loadModelsList()
 	if err != nil {
-		modelsList = []config.ResModel{}
+		modelsList = []api.ModelInfo{}
 	}
 	if len(modelsList) == 0 {
 		fmt.Println("No models found, add models in ~/.lightcode/config.json")
@@ -910,7 +910,7 @@ func (m model) handleModelsListInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
-func findModelIndex(modelsList []config.ResModel, selectedModel config.ResModel) int {
+func findModelIndex(modelsList []api.ModelInfo, selectedModel api.ModelInfo) int {
 	for i, model := range modelsList {
 		if model.Model == selectedModel.Model && model.BaseUrl == selectedModel.BaseUrl {
 			return i

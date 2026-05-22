@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Kartik-2239/lightcode/internal/server/api"
 	"github.com/Kartik-2239/lightcode/internal/server/config"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
 )
@@ -220,25 +221,25 @@ func CompactMemory(session_id string) (int64, error) {
 	return contextSize, nil
 }
 
-func GetModels() ([]config.ResModel, []config.RecentModels, error) {
+func GetModels() ([]api.ModelInfo, []api.ModelInfo, error) {
 	resp, err := http.Get(baseUrl + "/get-models")
 	if err != nil {
 		// log.Fatal(err)
-		return []config.ResModel{}, []config.RecentModels{}, err
+		return []api.ModelInfo{}, []api.ModelInfo{}, err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		// log.Fatal(err)
-		return []config.ResModel{}, []config.RecentModels{}, err
+		return []api.ModelInfo{}, []api.ModelInfo{}, err
 	}
-	var modelsList config.AllModels
+	var modelsList api.ModelTypes
 	err = json.Unmarshal(body, &modelsList)
 	if err != nil {
 		// log.Fatal(err)
-		return []config.ResModel{}, []config.RecentModels{}, err
+		return []api.ModelInfo{}, []api.ModelInfo{}, err
 	}
-	return modelsList.Models, modelsList.RecentModels, nil
+	return modelsList.Models, modelsList.Recent, nil
 }
 func GetCurrentModel() (config.ResModel, error) {
 	resp, err := http.Get(baseUrl + "/get-current-model")
@@ -261,10 +262,10 @@ func GetCurrentModel() (config.ResModel, error) {
 	return cur_model, nil
 }
 
-func SetApiKey(m config.ResModel, apikey string) error {
+func SetApiKey(m api.ModelInfo, apikey string) error {
 	body := struct {
-		ApiKey string          `json:"api_key"`
-		Model  config.ResModel `json:"model"`
+		ApiKey string        `json:"api_key"`
+		Model  api.ModelInfo `json:"model"`
 	}{
 		ApiKey: apikey,
 		Model:  m,
@@ -280,7 +281,7 @@ func SetApiKey(m config.ResModel, apikey string) error {
 	return nil
 }
 
-func SetCurrentModel(m config.ResModel) error {
+func SetCurrentModel(m api.ModelInfo) error {
 	bodybytes, err := json.Marshal(m)
 	if err != nil {
 		return err

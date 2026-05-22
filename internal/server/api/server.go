@@ -1,9 +1,9 @@
-package server
+package api
 
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -14,7 +14,7 @@ import (
 	"github.com/Kartik-2239/lightcode/internal/server/config"
 	"github.com/Kartik-2239/lightcode/internal/server/db"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
-	"github.com/Kartik-2239/lightcode/internal/server/llm"
+	"github.com/Kartik-2239/lightcode/internal/server/llm/llmModel"
 	"gorm.io/gorm"
 )
 
@@ -119,6 +119,7 @@ func chatcompletion(w http.ResponseWriter, r *http.Request) {
 	session_id := r.URL.Query().Get("session_id")
 	prompt := r.URL.Query().Get("prompt")
 	mode := r.URL.Query().Get("mode")
+	model := config.GetCustomization().CurrentModel
 
 	var req Request
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -131,7 +132,7 @@ func chatcompletion(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
 		return
 	}
-	for result := range agent.New(DB).Run(r.Context(), prompt, req.Images, session_id, mode, DEBUG) {
+	for result := range agent.New(DB).Run(r.Context(), model, prompt, req.Images, session_id, mode, DEBUG) {
 		if r.Context().Err() != nil {
 			return
 		}
@@ -220,9 +221,43 @@ func getModels(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 
 	}
-	payload := config.AllModels{
-		Models:       list_models,
-		RecentModels: recent_models,
+	authModels, err := config.GetAllAuthModels()
+	if err != nil {
+		log.Fatal("fuck no models in openai codex shit bitch")
+	}
+	// models := make([]ModelInfo, 0, len(list_models)+len(authModels))
+	models := []ModelInfo{}
+	recent := make([]ModelInfo, len(recent_models))
+
+	for _, m := range list_models {
+		models = append(models, ModelInfo{
+			Model:    m.Model,
+			ApiKey:   m.ApiKey,
+			BaseUrl:  m.BaseUrl,
+			Provider: providerFromBaseUrl(m.BaseUrl),
+		})
+	}
+	for _, m := range authModels {
+		models = append(models, ModelInfo{
+			Model:    m.Model,
+			ApiKey:   m.ApiKey,
+			BaseUrl:  m.BaseUrl,
+			Provider: m.BaseUrl + " auth",
+		})
+	}
+	for i, m := range recent_models {
+		recent[i] = ModelInfo{
+			Model:    m.Model,
+			ApiKey:   m.ApiKey,
+			BaseUrl:  m.BaseUrl,
+			Provider: providerFromBaseUrl(m.BaseUrl),
+			LastUsed: m.LastUsed,
+		}
+	}
+	var payload ModelTypes
+	payload = ModelTypes{
+		Models: models,
+		Recent: recent,
 	}
 	json.NewEncoder(w).Encode(payload)
 }
@@ -268,12 +303,12 @@ func compactMemory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chats := make([]llm.Chat, 0, len(messages))
+	chats := make([]llmModel.Chat, 0, len(messages))
 	slices.Reverse(messages)
 	for _, message := range messages {
 		d := models.DecodeMessageData(message.Data)
 		if strings.HasPrefix(d.Content, "<memory>") && strings.HasSuffix(d.Content, "</memory>") {
-			chats = append(chats, llm.Chat{Role: "user", Content: d.Content})
+			chats = append(chats, llmModel.Chat{Role: "user", Content: d.Content})
 			break
 		}
 		switch d.Role {
@@ -283,14 +318,14 @@ func compactMemory(w http.ResponseWriter, r *http.Request) {
 				name = d.ToolCalls[0].Name
 				id = d.ToolCalls[0].ID
 			}
-			chats = append(chats, llm.Chat{
+			chats = append(chats, llmModel.Chat{
 				Role:    "user",
 				Content: fmt.Sprintf("Tool %q (call_id=%s) output:\n%s", name, id, d.Content),
 			})
 		case "assistant":
-			chats = append(chats, llm.Chat{Role: "assistant", Content: d.Content})
+			chats = append(chats, llmModel.Chat{Role: "assistant", Content: d.Content})
 		default:
-			chats = append(chats, llm.Chat{Role: "user", Content: d.Content})
+			chats = append(chats, llmModel.Chat{Role: "user", Content: d.Content})
 		}
 	}
 	slices.Reverse(chats)
@@ -310,14 +345,4 @@ func compactMemory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Fprint(w, len(compactedMemory.Content)/4)
-}
-
-func randomSessionID() string {
-	var chars = "qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890-_"
-	length := 10
-	var result strings.Builder
-	for range length {
-		result.WriteString(string(chars[rand.Intn(len(chars))]))
-	}
-	return result.String()
 }

@@ -7,8 +7,10 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Kartik-2239/lightcode/internal/server/config"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
 	"github.com/Kartik-2239/lightcode/internal/server/llm"
+	"github.com/Kartik-2239/lightcode/internal/server/llm/llmModel"
 	"gorm.io/gorm"
 )
 
@@ -25,7 +27,7 @@ func New(db *gorm.DB) *Agent {
 	return &Agent{db}
 }
 
-func (a *Agent) Run(ctx context.Context, prompt string, b64_imgs [][]byte, session_id string, mode string, DEBUG bool) <-chan models.StoredMessageData {
+func (a *Agent) Run(ctx context.Context, model config.ResModel, prompt string, b64_imgs [][]byte, session_id string, mode string, DEBUG bool) <-chan models.StoredMessageData {
 	ch := make(chan models.StoredMessageData)
 	// currentPrompt := prompt
 	database := a.db
@@ -63,7 +65,7 @@ func (a *Agent) Run(ctx context.Context, prompt string, b64_imgs [][]byte, sessi
 			}
 			var messages []models.Message
 			database.Where("session_id = ?", session_id).Find(&messages)
-			chats := make([]llm.Chat, 0, len(messages)+2)
+			chats := make([]llmModel.Chat, 0, len(messages)+2)
 
 			// before starting the agent check if the token usage till the last memory compaction.
 			/*
@@ -79,7 +81,7 @@ func (a *Agent) Run(ctx context.Context, prompt string, b64_imgs [][]byte, sessi
 			for _, message := range messages {
 				d := models.DecodeMessageData(message.Data)
 				if strings.HasPrefix(d.Content, "<memory>") && strings.HasSuffix(d.Content, "</memory>") {
-					chats = append(chats, llm.Chat{
+					chats = append(chats, llmModel.Chat{
 						Role:    "user",
 						Content: d.Content,
 					})
@@ -92,15 +94,15 @@ func (a *Agent) Run(ctx context.Context, prompt string, b64_imgs [][]byte, sessi
 						name = d.ToolCalls[0].Name
 						id = d.ToolCalls[0].ID
 					}
-					chats = append(chats, llm.Chat{
+					chats = append(chats, llmModel.Chat{
 						Role:    "user",
 						Content: fmt.Sprintf("Tool %q (call_id=%s) output:\n%s", name, id, d.Content),
 					})
 				case "assistant":
 					content := d.Content
-					chats = append(chats, llm.Chat{Role: "assistant", Content: content})
+					chats = append(chats, llmModel.Chat{Role: "assistant", Content: content})
 				default:
-					chats = append(chats, llm.Chat{Role: "user", Content: d.Content})
+					chats = append(chats, llmModel.Chat{Role: "user", Content: d.Content})
 				}
 			}
 			slices.Reverse(chats)
@@ -151,18 +153,18 @@ func (a *Agent) Run(ctx context.Context, prompt string, b64_imgs [][]byte, sessi
 			agents_md, err := ReadAgentsMd(session.Directory)
 			if err != nil {
 				slices.Reverse(chats)
-				chats = append(chats, llm.Chat{Role: "user", Content: fmt.Sprintf("<agents_md>%s<agents_md>", agents_md)})
+				chats = append(chats, llmModel.Chat{Role: "user", Content: fmt.Sprintf("<agents_md>%s<agents_md>", agents_md)})
 				slices.Reverse(chats)
 			}
-			var resp llm.Response
+			var resp llmModel.Response
 			if len(b64_imgs) >= 0 {
 				if len(chats) <= 1 {
-					resp, err = llm.ApiCall(ctx, prompt, []llm.Chat{}, mode, b64_imgs)
+					resp, err = llm.ApiCall(ctx, model, prompt, []llmModel.Chat{}, []models.Message{}, mode, b64_imgs)
 				} else {
-					resp, err = llm.ApiCall(ctx, prompt, chats[:len(chats)-1], mode, b64_imgs)
+					resp, err = llm.ApiCall(ctx, model, prompt, chats[:len(chats)-1], messages, mode, b64_imgs)
 				}
 			} else {
-				resp, err = llm.ApiCall(ctx, "", chats, mode, [][]byte{})
+				resp, err = llm.ApiCall(ctx, model, prompt, chats, messages, mode, [][]byte{})
 			}
 			if err != nil {
 				errorMessage := models.StoredMessageData{Role: "error", Content: resp.Text, Usage: &models.StoredUsage{}}

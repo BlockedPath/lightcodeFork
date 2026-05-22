@@ -4,43 +4,30 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/Kartik-2239/lightcode/internal/server/config"
+	"github.com/Kartik-2239/lightcode/internal/server/db/models"
+	"github.com/Kartik-2239/lightcode/internal/server/llm/llmModel"
+	"github.com/Kartik-2239/lightcode/internal/server/oauth"
 	"github.com/Kartik-2239/lightcode/internal/server/prompt"
 	"github.com/Kartik-2239/lightcode/internal/server/tools"
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 )
 
-type Response struct {
-	Text             string
-	ToolCalls        []ToolCall
-	CompleteResponse *openai.ChatCompletion
-}
-
-type ToolCall struct {
-	ID        string
-	Name      string
-	Arguments string
-}
-
-type Chat struct {
-	Role       string
-	Content    string
-	ToolCallID string
-}
-
-func ApiCall(ctx context.Context, input string, chats []Chat, mode string, img_bytes [][]byte) (Response, error) {
-	var toolCalls []ToolCall
-	cur_model, err := config.GetCurrentModel()
-	if err != nil {
-		return Response{
-			Text:             "Ran into an error while getting the model",
-			ToolCalls:        []ToolCall{},
-			CompleteResponse: nil,
-		}, err
-	}
-	client := openai.NewClient(option.WithAPIKey(cur_model.ApiKey), option.WithBaseURL(cur_model.BaseUrl))
+func ApiCall(ctx context.Context, m config.ResModel, input string, chats []llmModel.Chat, originalMessages []models.Message, mode string, img_bytes [][]byte) (llmModel.Response, error) {
+	trimmedMessages := originalMessages[len(originalMessages)-len(chats):]
+	var toolCalls []llmModel.ToolCall
+	// cur_model, err := config.GetCurrentModel()
+	// if err != nil {
+	// 	return Response{
+	// 		Text:             "Ran into an error while getting the model",
+	// 		ToolCalls:        []ToolCall{},
+	// 		CompleteResponse: nil,
+	// 	}, err
+	// }
 
 	var messages []openai.ChatCompletionMessageParamUnion
 	if mode == "plan" {
@@ -87,60 +74,58 @@ func ApiCall(ctx context.Context, input string, chats []Chat, mode string, img_b
 	if len(parts) > 0 {
 		messages = append(messages, openai.UserMessage(parts))
 	}
-	m := cur_model.Model
+	// m := cur_model.Model
+	var resp *openai.ChatCompletion
+	var err error
+	if strings.HasPrefix(m.BaseUrl, "https://") {
+		client := openai.NewClient(option.WithAPIKey(m.ApiKey), option.WithBaseURL(m.BaseUrl))
 
-	// if mode == "plan" {
-	// 	resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-	// 		Messages: messages,
-	// 		Tools:    tools.GetToolsForPlan(),
-	// 		Model:    m,
-	// 	})
-	// }else{
-	resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Messages: messages,
-		Tools:    tools.GetToolsForChat(),
-		Model:    m,
-	})
-
-	// }
+		resp, err = client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+			Messages: messages,
+			Tools:    tools.GetToolsForChat(),
+			Model:    m.Model,
+		})
+	} else {
+		resp, err = oauth.MakeOauthRequest(m.BaseUrl, m.Model, trimmedMessages, "WRITE CODE DON'T KEEP SAYING HI AGAIN AND AGAIN AFTER USER ASKS YOU TO DO SOMETHING.\n"+" Available skills: "+" "+prompt.AvailableSkills(), tools.GetAllTools())
+	}
 
 	if err != nil {
-		// fmt.Println("Error", err)
+		fmt.Println("Error", err.Error())
 		var apierr *openai.Error
 		if errors.As(err, &apierr) {
-			return Response{
+			return llmModel.Response{
 				Text:             apierr.Message,
-				ToolCalls:        []ToolCall{},
+				ToolCalls:        []llmModel.ToolCall{},
 				CompleteResponse: nil,
 			}, err
 		}
-		return Response{Text: "Internal Error: " + err.Error()}, err
+		return llmModel.Response{Text: "Internal Error: " + err.Error()}, err
 
 	}
 	if len(resp.Choices) == 0 {
-		return Response{
+		return llmModel.Response{
 			Text:             "Ran into an error while calling the LLM",
-			ToolCalls:        []ToolCall{},
+			ToolCalls:        []llmModel.ToolCall{},
 			CompleteResponse: nil,
 		}, err
 	}
 
 	for _, item := range resp.Choices[0].Message.ToolCalls {
-		toolCalls = append(toolCalls, ToolCall{
+		toolCalls = append(toolCalls, llmModel.ToolCall{
 			ID:        item.ID,
 			Name:      item.Function.Name,
 			Arguments: item.Function.Arguments,
 		})
 	}
 
-	return Response{
+	return llmModel.Response{
 		Text:             resp.Choices[0].Message.Content,
 		ToolCalls:        toolCalls,
 		CompleteResponse: resp,
 	}, nil
 }
 
-func ExecuteToolCall(tc ToolCall, workingDirectory string, sessionID string) (tools.ToolResponse, error) {
+func ExecuteToolCall(tc llmModel.ToolCall, workingDirectory string, sessionID string) (tools.ToolResponse, error) {
 	args, err := tools.ParseArgs(tc.Arguments)
 	if err != nil {
 		return tools.ToolResponse{Content: "Error: " + err.Error()}, err
