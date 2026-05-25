@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -61,7 +62,9 @@ func GetAllTools() []responses.ToolUnionParam {
 	defer mu.RUnlock()
 
 	var result []responses.ToolUnionParam
-	for name, def := range defs {
+	// for name, def := range defs {
+	for _, name := range sortedToolNamesLocked() {
+		def := defs[name]
 		result = append(result, responses.ToolUnionParam{
 			OfFunction: &responses.FunctionToolParam{
 				Name:        name,
@@ -78,7 +81,9 @@ func GetToolsForPlan() []openai.ChatCompletionToolUnionParam {
 	defer mu.RUnlock()
 
 	var result []openai.ChatCompletionToolUnionParam
-	for name, def := range defs {
+	// for name, def := range defs {
+	for _, name := range sortedToolNamesLocked() {
+		def := defs[name]
 		if name == "write_file" || name == "edit" {
 			continue
 		}
@@ -101,7 +106,9 @@ func GetToolsForChat() []openai.ChatCompletionToolUnionParam {
 	defer mu.RUnlock()
 
 	var result []openai.ChatCompletionToolUnionParam
-	for name, def := range defs {
+	// for name, def := range defs {
+	for _, name := range sortedToolNamesLocked() {
+		def := defs[name]
 		result = append(result, openai.ChatCompletionToolUnionParam{
 			OfFunction: &openai.ChatCompletionFunctionToolParam{
 				Type: "function",
@@ -138,4 +145,13 @@ func ParseArgs(raw string) (map[string]any, error) {
 	var args map[string]any
 	err := json.Unmarshal([]byte(raw), &args)
 	return args, err
+}
+
+func sortedToolNamesLocked() []string {
+	names := make([]string, 0, len(defs))
+	for name := range defs {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }

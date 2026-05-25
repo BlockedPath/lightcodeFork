@@ -117,6 +117,10 @@ func ApiCall(ctx context.Context, m config.ResModel, input string, chats []llmMo
 			Arguments: item.Function.Arguments,
 		})
 	}
+	fmt.Println("===========CACHED==============")
+	fmt.Println("cached token", resp.Usage.PromptTokensDetails.CachedTokens)
+	fmt.Println("usage: ", resp.Usage)
+	fmt.Println("===========CACHED==============")
 
 	return llmModel.Response{
 		Text:             resp.Choices[0].Message.Content,

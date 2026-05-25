@@ -13,7 +13,9 @@ import (
 )
 
 func predictTokenCount(messages []models.Message, i int) int64 {
-	messages_before_current := messages[:i]
+	// messages_before_current := messages[:i]
+	messages_before_current := make([]models.Message, i)
+	copy(messages_before_current, messages[:i])
 	slices.Reverse(messages_before_current)
 	// messages_after_current := messages[i:]
 

@@ -64,6 +64,22 @@ type codexContentPart struct {
 	Text string `json:"text,omitempty"`
 }
 
+type Usage struct {
+	InputTokens        int64              `json:"input_tokens"`
+	OutputTokens       int64              `json:"output_tokens"`
+	TotalTokens        int64              `json:"total_tokens"`
+	InputTokenDetails  InputTokenDetails  `json:"input_tokens_details"`
+	OutputTokenDetails OutputTokenDetails `json:"output_tokens_details"`
+}
+
+type InputTokenDetails struct {
+	CachedTokens int64 `json:"cached_tokens"`
+}
+
+type OutputTokenDetails struct {
+	ReasoningTokens int64 `json:"reasoning_tokens"`
+}
+
 func MakeOauthRequest(provider string, model string, messages []models.Message, system string, tools []responses.ToolUnionParam) (*openai.ChatCompletion, error) {
 	authVal, err := config.GetAuthVal(provider, model)
 	if authVal.Expires == 0 || authVal.Expires < time.Now().Unix() {
@@ -286,6 +302,29 @@ func applyStreamEvent(result *openai.ChatCompletion, eventType string, payload s
 			return err
 		}
 		appendOutputItem(result, event.Item)
+	case "response.completed":
+		var data struct {
+			Response struct {
+				Usage Usage `json:"usage"`
+			} `json:"response"`
+		}
+		if err := json.Unmarshal([]byte(payload), &data); err != nil {
+			return err
+		}
+		// fmt.Println("=========================USAGE=========================")
+		// fmt.Println(data.Response.Usage)
+		// fmt.Println("=========================USAGE END=========================")
+		result.Usage = openai.CompletionUsage{
+			CompletionTokens: data.Response.Usage.OutputTokens,
+			PromptTokens:     data.Response.Usage.InputTokens,
+			TotalTokens:      data.Response.Usage.TotalTokens,
+			CompletionTokensDetails: openai.CompletionUsageCompletionTokensDetails{
+				ReasoningTokens: data.Response.Usage.OutputTokenDetails.ReasoningTokens,
+			},
+			PromptTokensDetails: openai.CompletionUsagePromptTokensDetails{
+				CachedTokens: data.Response.Usage.InputTokenDetails.CachedTokens,
+			},
+		}
 	}
 
 	return nil

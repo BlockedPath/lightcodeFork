@@ -64,7 +64,7 @@ func (a *Agent) Run(ctx context.Context, model config.ResModel, prompt string, b
 				fmt.Println("Iteration:", i)
 			}
 			var messages []models.Message
-			database.Where("session_id = ?", session_id).Find(&messages)
+			database.Where("session_id = ?", session_id).Order("time_created ASC").Find(&messages)
 			chats := make([]llmModel.Chat, 0, len(messages)+2)
 
 			// before starting the agent check if the token usage till the last memory compaction.
@@ -157,7 +157,7 @@ func (a *Agent) Run(ctx context.Context, model config.ResModel, prompt string, b
 				slices.Reverse(chats)
 			}
 			var resp llmModel.Response
-			if len(b64_imgs) >= 0 {
+			if len(b64_imgs) > 0 {
 				if len(chats) <= 1 {
 					resp, err = llm.ApiCall(ctx, model, prompt, []llmModel.Chat{}, []models.Message{}, mode, b64_imgs)
 				} else {
