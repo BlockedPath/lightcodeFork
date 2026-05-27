@@ -77,7 +77,7 @@ func ApiCall(ctx context.Context, m config.ResModel, input string, chats []llmMo
 	// m := cur_model.Model
 	var resp *openai.ChatCompletion
 	var err error
-	if strings.HasPrefix(m.BaseUrl, "https://") {
+	if strings.HasPrefix(m.BaseUrl, "http") {
 		client := openai.NewClient(option.WithAPIKey(m.ApiKey), option.WithBaseURL(m.BaseUrl))
 
 		resp, err = client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
