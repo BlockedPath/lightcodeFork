@@ -22,10 +22,13 @@ var baseUrl string
 
 func init() {
 	port := config.GetCustomization().Port
+	portToUse := getPortRunningServer()
+
 	if port == "" {
 		port = "8080"
 	}
-	baseUrl = "http://localhost:" + port
+
+	baseUrl = "http://localhost:" + portToUse
 }
 
 func ListSession() ([]models.Session, error) {
@@ -291,4 +294,22 @@ func SetCurrentModel(m api.ModelInfo) error {
 		return err
 	}
 	return nil
+}
+
+func GetCopilotModels() ([]string, error) {
+	resp, err := http.Get(baseUrl + "/get-copilot-models")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var models []string
+	err = json.Unmarshal(body, &models)
+	if err != nil {
+		return nil, err
+	}
+	return models, nil
 }

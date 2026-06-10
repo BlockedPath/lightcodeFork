@@ -15,6 +15,7 @@ import (
 	"github.com/Kartik-2239/lightcode/internal/server/db"
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
 	"github.com/Kartik-2239/lightcode/internal/server/llm/llmModel"
+	"github.com/Kartik-2239/lightcode/internal/server/oauth"
 	"gorm.io/gorm"
 )
 
@@ -50,6 +51,7 @@ func Initialise(ready chan<- struct{}, port string, isDebug bool) {
 	http.HandleFunc("POST /set-api-key", setApiKey)
 	http.HandleFunc("POST /set-current-model", setCurrentModel)
 	http.HandleFunc("GET /compact-memory", compactMemory)
+	http.HandleFunc("GET /get-copilot-models", getCopilotModels)
 	// http.ListenAndServe(":8080", nil)
 
 	ln, err := net.Listen("tcp", ":"+port)
@@ -345,4 +347,17 @@ func compactMemory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Fprint(w, len(compactedMemory.Content)/4)
+}
+
+func getCopilotModels(w http.ResponseWriter, r *http.Request) {
+	models, err := oauth.MakeModelsRequest()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	model_list := make([]string, len(models))
+	for i, m := range models {
+		model_list[i] = m.Name
+	}
+	json.NewEncoder(w).Encode(model_list)
 }

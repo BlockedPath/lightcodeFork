@@ -85,6 +85,79 @@ func ApiCall(ctx context.Context, m config.ResModel, input string, chats []llmMo
 			Tools:    tools.GetToolsForChat(),
 			Model:    m.Model,
 		})
+	} else if m.BaseUrl == "copilot" {
+		models, err := oauth.MakeModelsRequest()
+		if err != nil {
+			return llmModel.Response{Text: "Error fetching models from copilot: " + err.Error()}, err
+		}
+		var endpoint string
+		for _, model := range models {
+			if model.Name == m.Model {
+				endpoint = model.SupportedEndpoints[0]
+			}
+		}
+		if endpoint == "" {
+			return llmModel.Response{Text: "Error: model not found in copilot"}, errors.New("model not found in copilot")
+		}
+		if endpoint == "/chat/completions" {
+			copilotReq := oauth.CopilotChatCompletionRequest{Model: m.Model, Stream: false}
+			tools := tools.GetToolsForChat()
+			copilot_tools := make([]oauth.CopilotChatTool, len(tools))
+			for i, tool := range tools {
+				copilot_tools[i] = oauth.CopilotChatTool{
+					Type: "function",
+					Function: oauth.CopilotToolFunction{
+						Name:        tool.GetFunction().Name,
+						Description: tool.GetFunction().Description.String(),
+						Parameters:  tool.GetFunction().Parameters,
+					},
+				}
+			}
+			msgs := make([]oauth.CopilotChatMessage, len(chats))
+			for i, msg := range chats {
+				msgs[i] = oauth.CopilotChatMessage{
+					Role:    string(msg.Role),
+					Content: msg.Content,
+				}
+			}
+			copilotReq.Messages = msgs
+			copilotReq.Tools = copilot_tools
+			response, err := oauth.MakeCopilotChatCompletionRequest(copilotReq)
+			toolcalls := make([]llmModel.ToolCall, len(response.Choices[0].Message.ToolCalls))
+			for i, tc := range response.Choices[0].Message.ToolCalls {
+				toolcalls[i] = llmModel.ToolCall{
+					ID:        tc.ID,
+					Name:      tc.Function.Name,
+					Arguments: tc.Function.Arguments,
+				}
+			}
+			var completeResponse *openai.ChatCompletion
+			completeResponse = &openai.ChatCompletion{
+				ID: response.ID,
+				Choices: []openai.ChatCompletionChoice{
+					{
+						FinishReason: resp.Choices[0].FinishReason,
+						Index:        resp.Choices[0].Index,
+						Logprobs:     resp.Choices[0].Logprobs,
+						Message:      resp.Choices[0].Message,
+					},
+				},
+				Usage: openai.CompletionUsage{
+					PromptTokens:     int64(response.Usage.PromptTokens),
+					CompletionTokens: int64(response.Usage.CompletionTokens),
+					TotalTokens:      int64(response.Usage.TotalTokens),
+				},
+			}
+			return llmModel.Response{
+				Text:             response.Choices[0].Message.Content,
+				ToolCalls:        toolcalls,
+				CompleteResponse: completeResponse,
+			}, err
+
+		}
+		if endpoint == "/v1/responses" {
+			// copilotMessages := oauth.CopilotResponsesRequest{}
+		}
 	} else {
 		resp, err = oauth.MakeOauthRequest(m.BaseUrl, m.Model, trimmedMessages, "WRITE CODE DON'T KEEP SAYING HI AGAIN AND AGAIN AFTER USER ASKS YOU TO DO SOMETHING.\n"+" Available skills: "+" "+prompt.AvailableSkills(), tools.GetAllTools())
 	}

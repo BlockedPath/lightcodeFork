@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"net/http"
 	"os"
 	"runtime/debug"
+	"strconv"
 	"strings"
 
 	"github.com/Kartik-2239/lightcode/internal/server/agent"
@@ -71,23 +71,33 @@ func isPortInUse(port string) bool {
 	ln.Close()
 	return false
 }
-func Lightcode(isServer bool, isTui bool, isDebug bool) {
+
+func getUsablePort() string {
 	port := config.GetCustomization().Port
-	if !isPortInUse(port) {
-		_, err := http.Get("http://localhost:" + port)
-		if err != nil {
-			if isServer && isTui {
-				ready := make(chan struct{})
-				go api.Initialise(ready, port, isDebug)
-				<-ready
-			}
-			if isServer && !isTui {
-				ready := make(chan struct{})
-				api.Initialise(ready, port, isDebug)
-			}
+	portInt, _ := strconv.Atoi(port)
+	isPortInUse(port)
+	for {
+		// fmt.Println(portInt)
+		if !isPortInUse(strconv.Itoa(portInt)) {
+			return strconv.Itoa(portInt)
+		} else {
+			portInt++
 		}
 	}
-	if isTui {
+}
+
+func Lightcode(isServer bool, isTui bool, isDebug bool) {
+	usablePort := getUsablePort()
+	if isServer && isTui {
+		ready := make(chan struct{})
+		go api.Initialise(ready, usablePort, isDebug)
+		<-ready
+	}
+	if isServer && !isTui {
+		ready := make(chan struct{})
+		api.Initialise(ready, usablePort, isDebug)
+	}
+	if isTui && !isServer {
 		views.LauchHomePage()
 	}
 }

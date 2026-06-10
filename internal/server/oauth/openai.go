@@ -81,7 +81,7 @@ type OutputTokenDetails struct {
 }
 
 func MakeOauthRequest(provider string, model string, messages []models.Message, system string, tools []responses.ToolUnionParam) (*openai.ChatCompletion, error) {
-	authVal, err := config.GetAuthVal(provider, model)
+	authVal, err := config.GetAuthVal(provider)
 	if authVal.Expires == 0 || authVal.Expires < time.Now().Unix() {
 		// fmt.Printf("Tokens for provider %s have expired or are missing, refreshing...\n", provider)
 		var fetchErr error

@@ -17,7 +17,7 @@ type AuthVal struct {
 
 type AuthJson map[string]AuthVal
 
-func GetAuthVal(provider string, model string) (AuthVal, error) {
+func GetAuthVal(provider string) (AuthVal, error) {
 	path, err := GetAuthPath()
 	if err != nil {
 		return AuthVal{}, err
