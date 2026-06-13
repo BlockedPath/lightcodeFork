@@ -95,6 +95,13 @@ type model struct {
 	mode               string
 	modelsList         []api.ModelInfo
 	isModelsListWin    bool
+	isLoginProviderWin bool
+	loginProviders     []loginProvider
+	loginProviderIndex int
+	loginAction        string
+	isEffortWin        bool
+	effortOptions      []effortOption
+	effortIndex        int
 	modelsListIndex    int
 	isCompacting       bool
 	queue              []queue
@@ -164,10 +171,6 @@ func initialModel() model {
 	if err != nil {
 		modelsList = []api.ModelInfo{}
 	}
-	if len(modelsList) == 0 {
-		fmt.Println("No models found, add models in ~/.lightcode/config.json")
-		os.Exit(1)
-	}
 
 	// currentModel, err := config.GetCurrentModel()
 	currentModel, err := client.GetCurrentModel()
@@ -206,12 +209,29 @@ func initialModel() model {
 		modes:              []string{"chat", "plan", "assistant"},
 		modelsList:         modelsList,
 		isModelsListWin:    false,
+		loginProviders:     defaultLoginProviders(),
+		isLoginProviderWin: false,
+		loginProviderIndex: 0,
+		loginAction:        "login",
+		effortOptions:      defaultEffortOptions(),
+		isEffortWin:        false,
+		effortIndex:        0,
 		modelsListIndex:    currentModelIndex,
 		imgPasteCounter:    0,
 		pastedImgs:         make(map[int][]byte),
 		pastedImgPreviews:  make(map[int]kittyPreview),
 		currentContextSize: 0,
 		enter_api_win:      false,
+	}
+	if len(modelsList) == 0 {
+		m.messages = append(m.messages, models.Message{
+			SessionID: m.currentSession.ID,
+			Data: models.EncodeMessageData(models.StoredMessageData{
+				Role:    "assistant",
+				Content: "No provider is logged in. Run `/login` to select and authenticate a provider.",
+			}),
+		})
+		m.refreshMessagesView()
 	}
 	m.listModels.Refresh(modelsList)
 	m.syncLayout()
@@ -255,6 +275,12 @@ func (m *model) syncLayout() {
 	}
 	if m.isModelsListWin {
 		reservedHeight += m.listModels.Height()
+	}
+	if m.isLoginProviderWin {
+		reservedHeight += loginProviderListHeight(len(m.loginProviders))
+	}
+	if m.isEffortWin {
+		reservedHeight += effortListHeight(len(m.effortOptions))
 	}
 	// for textarea border
 	reservedHeight += 2
@@ -352,6 +378,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.isModelsListWin {
 			return m.handleModelsListInput(msg)
+		}
+		if m.isLoginProviderWin {
+			return m.handleLoginProviderInput(msg)
+		}
+		if m.isEffortWin {
+			return m.handleEffortInput(msg)
 		}
 		switch msg.String() {
 		case "ctrl+c":
@@ -722,6 +754,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.syncLayout()
 		return m, nil
 
+	case loginFinishedMsg:
+		return m.handleLoginFinished(msg)
+
+	case copilotLoginStartedMsg:
+		return m.handleCopilotLoginStarted(msg)
+
+	case logoutFinishedMsg:
+		return m.handleLogoutFinished(msg)
+
 	case clearEscMsgMsg:
 		m.showEscMsg = false
 		return m, nil
@@ -769,11 +810,6 @@ func (m model) View() tea.View {
 
 	if m.enter_api_win {
 		sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.BrightRed).Render("enter api key for "+m.listModels.Current().Model))
-	} else {
-		shortenedDir := shortenDir(m.currentSession.Directory)
-		if shortenedDir != "." {
-			sections = append(sections, lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Render(shortenedDir))
-		}
 	}
 
 	sections = append(sections, lipgloss.NewStyle().Render(strings.Repeat("—", m.width)))
@@ -788,21 +824,18 @@ func (m model) View() tea.View {
 	if m.isModelsListWin {
 		sections = append(sections, m.listModels.StringView())
 	}
+	if m.isLoginProviderWin {
+		sections = append(sections, m.renderLoginProviderList())
+	}
+	if m.isEffortWin {
+		sections = append(sections, m.renderEffortList())
+	}
 
-	// mode and model name
-	// if !m.islistCommandsWin && !m.isModelsListWin {
-	s := strings.ToUpper(m.mode[:1]) + m.mode[1:] + " "
-	model_name := m.modelsList[m.modelsListIndex].Model
-
-	mode := lipgloss.NewStyle().Foreground(lipgloss.BrightMagenta).Bold(true).Render(s)
-	modelName := lipgloss.NewStyle().Foreground(lipgloss.Color("43")).Bold(false).Render(model_name)
-
-	formatted_context := FormatK(m.currentContextSize) + " (" + strconv.FormatFloat(float64(m.currentContextSize)/1280, 'f', 1, 64) + "%)"
-
-	contextSize := lipgloss.NewStyle().Align(lipgloss.Right).Foreground(lipgloss.BrightMagenta).Width(m.width - len(s) - len(model_name)).Render(formatted_context)
-
-	sections = append(sections, lipgloss.JoinHorizontal(lipgloss.Bottom, mode, modelName, contextSize))
-	// }
+	currentModel := api.ModelInfo{}
+	if m.modelsListIndex >= 0 && m.modelsListIndex < len(m.modelsList) {
+		currentModel = m.modelsList[m.modelsListIndex]
+	}
+	sections = append(sections, renderStatusLine(currentModel, m.currentContextSize, m.width))
 
 	if m.isGenerating || m.isCompacting {
 		if m.showEscMsg {
@@ -878,7 +911,7 @@ func (m model) handleModelsListInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.textarea.Placeholder = "Send a message..."
 		if msg.String() == "enter" && selectedModel.Model != "" {
 			m.modelsListIndex = findModelIndex(m.modelsList, selectedModel)
-			if selectedModel.ApiKey == "" {
+			if selectedModel.ApiKey == "" && !isAuthBackedModel(selectedModel) {
 				m.enter_api_win = true
 				m.textarea.Placeholder = "enter api key for " + selectedModel.Model
 			}
@@ -908,6 +941,11 @@ func (m model) handleModelsListInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.syncLayout()
 		return m, cmd
 	}
+}
+
+func isAuthBackedModel(model api.ModelInfo) bool {
+	baseURL := strings.TrimSpace(model.BaseUrl)
+	return baseURL != "" && !strings.HasPrefix(baseURL, "http")
 }
 
 func findModelIndex(modelsList []api.ModelInfo, selectedModel api.ModelInfo) int {
