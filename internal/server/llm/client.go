@@ -127,7 +127,13 @@ func ApiCall(ctx context.Context, m config.ResModel, input string, chats []llmMo
 			copilotReq.Tools = copilot_tools
 			response, err := oauth.MakeCopilotChatCompletionRequest(copilotReq)
 			if err != nil {
-				return llmModel.Response{Text: "Internal Error: " + err.Error()}, err
+				if fallbackModel, ok := copilotIntegratorFallbackModel(selectedModel, err); ok {
+					copilotReq.Model = fallbackModel
+					response, err = oauth.MakeCopilotChatCompletionRequest(copilotReq)
+				}
+				if err != nil {
+					return llmModel.Response{Text: "Internal Error: " + err.Error()}, err
+				}
 			}
 			if len(response.Choices) == 0 {
 				return llmModel.Response{Text: "Ran into an error while calling Copilot"}, errors.New("copilot response did not include choices")
@@ -266,6 +272,18 @@ func copilotModelID(model oauth.CopilotModel) string {
 		return model.ID
 	}
 	return model.Name
+}
+
+func copilotIntegratorFallbackModel(model oauth.CopilotModel, err error) (string, bool) {
+	if err == nil || model.ID != "gemini-3.1-pro-preview" {
+		return "", false
+	}
+	message := err.Error()
+	if strings.Contains(message, "model_not_available_for_integrator") ||
+		strings.Contains(message, "not available for integrator") {
+		return "gemini-2.5-pro", true
+	}
+	return "", false
 }
 
 func copilotResponsesInput(chats []llmModel.Chat, input string) []oauth.CopilotResponsesInputItem {
