@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 )
 
+var Debug = false
+
 func Dir() string {
 	home, _ := os.UserHomeDir()
 	dir := filepath.Join(home, ".lightcode")

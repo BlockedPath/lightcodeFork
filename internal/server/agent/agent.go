@@ -27,7 +27,7 @@ func New(db *gorm.DB) *Agent {
 	return &Agent{db}
 }
 
-func (a *Agent) Run(ctx context.Context, model config.ResModel, prompt string, b64_imgs [][]byte, session_id string, mode string, DEBUG bool) <-chan models.StoredMessageData {
+func (a *Agent) Run(ctx context.Context, model config.ResModel, prompt string, b64_imgs [][]byte, session_id string, mode string) <-chan models.StoredMessageData {
 	ch := make(chan models.StoredMessageData)
 	// currentPrompt := prompt
 	database := a.db
@@ -59,7 +59,7 @@ func (a *Agent) Run(ctx context.Context, model config.ResModel, prompt string, b
 				return
 			default:
 			}
-			if DEBUG {
+			if config.Debug {
 				fmt.Println(strings.Repeat("=", 30))
 				fmt.Println("Iteration:", i)
 			}
@@ -108,7 +108,7 @@ func (a *Agent) Run(ctx context.Context, model config.ResModel, prompt string, b
 			slices.Reverse(chats)
 			slices.Reverse(messages)
 			// memory compaction
-			if DEBUG {
+			if config.Debug {
 				for _, item := range messages[len(messages)-len(chats):] {
 					data := models.DecodeMessageData(item.Data).Content
 					if len(data) > 100 {
@@ -120,7 +120,7 @@ func (a *Agent) Run(ctx context.Context, model config.ResModel, prompt string, b
 			}
 			token_count = predictTokenCount(messages[len(messages)-len(chats):], len(chats)-1)
 
-			if DEBUG {
+			if config.Debug {
 				fmt.Println("token_count", token_count)
 				// fmt.Println("CHATS: ", chats)
 			}
@@ -128,7 +128,7 @@ func (a *Agent) Run(ctx context.Context, model config.ResModel, prompt string, b
 				// leave the last few chats before compacting memory
 				compactedMemory, err := CompactMemory(chats)
 				if err != nil {
-					if DEBUG {
+					if config.Debug {
 						fmt.Println("Failed compacting memory with error : ", err)
 					}
 				}
@@ -138,7 +138,7 @@ func (a *Agent) Run(ctx context.Context, model config.ResModel, prompt string, b
 				}
 
 				if err := database.Create(&compactedMsg).Error; err != nil {
-					if DEBUG {
+					if config.Debug {
 						fmt.Println("Error creating message:", err, "?")
 					}
 				}
@@ -176,7 +176,7 @@ func (a *Agent) Run(ctx context.Context, model config.ResModel, prompt string, b
 				return
 			default:
 			}
-			if DEBUG {
+			if config.Debug {
 				fmt.Println("")
 				// fmt.Println("Tool calls:", resp.ToolCalls)
 				fmt.Println("Number of tool calls:", len(resp.ToolCalls))
@@ -194,16 +194,16 @@ func (a *Agent) Run(ctx context.Context, model config.ResModel, prompt string, b
 					// ID:        fmt.Sprintf("%s-%d", session_id, len(messages)),
 					Data: models.EncodeMessageData(assistantMessage),
 				}
-				if DEBUG {
+				if config.Debug {
 					fmt.Println("Creating message:", newMessage)
 				}
 				if err := database.Create(&newMessage).Error; err != nil {
-					if DEBUG {
+					if config.Debug {
 						fmt.Println("Error creating message:", err)
 					}
 					return
 				} else {
-					if DEBUG {
+					if config.Debug {
 						fmt.Println("Message created successfully! LAST!")
 					}
 				}
@@ -222,20 +222,20 @@ func (a *Agent) Run(ctx context.Context, model config.ResModel, prompt string, b
 				Data: models.EncodeMessageData(assistantMessage),
 			}
 			ch <- assistantMessage
-			if DEBUG {
+			if config.Debug {
 				fmt.Println("Creating message:", resp.CompleteResponse.Usage)
 			}
 			if err := database.Create(&assistantMsg).Error; err != nil {
-				if DEBUG {
+				if config.Debug {
 					fmt.Println("Error creating message:", err)
 				}
 			} else {
-				if DEBUG {
+				if config.Debug {
 					fmt.Println("Message created successfully!")
 				}
 			}
 			for _, tc := range resp.ToolCalls {
-				if DEBUG {
+				if config.Debug {
 					fmt.Println("Executing tool call:", tc.Name)
 				}
 				if tc.Name == "question" {
@@ -249,7 +249,7 @@ func (a *Agent) Run(ctx context.Context, model config.ResModel, prompt string, b
 				}
 				result, err := llm.ExecuteToolCall(tc, session.Directory, session_id)
 				if err != nil {
-					if DEBUG {
+					if config.Debug {
 						fmt.Println("Error executing tool call:", err)
 					}
 					ch <- models.StoredMessageData{Role: "error", Content: fmt.Sprintf("Tool '%s' failed: %v", tc.Name, err)}
@@ -261,7 +261,7 @@ func (a *Agent) Run(ctx context.Context, model config.ResModel, prompt string, b
 					Data:      models.EncodeMessageData(models.StoredMessageData{Role: "tool_call", Content: result.Content, CodeChanges: result.CodeChanges, ToolCalls: []models.StoredToolCall{{ID: tc.ID, Name: tc.Name, Arguments: tc.Arguments}}}),
 				}
 				database.Create(&toolMsg)
-				if DEBUG {
+				if config.Debug {
 					if len(result.Content) > 100 {
 						fmt.Println("Result of tool call:", result.Content[:100], ".....")
 					} else {

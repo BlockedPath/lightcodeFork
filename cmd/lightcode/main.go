@@ -124,7 +124,7 @@ func runAgent(prompt string) {
 
 	database.Create(&newMessage)
 	model := config.GetCustomization().CurrentModel
-	for result := range agent.New(database).Run(ctx, model, prompt, [][]byte{}, session_id, "chat", false) {
+	for result := range agent.New(database).Run(ctx, model, prompt, [][]byte{}, session_id, "chat") {
 		fmt.Println(result.Content)
 		for _, tool := range result.ToolCalls {
 			fmt.Printf("%s({%s})", tool.Name, tool.Arguments)
