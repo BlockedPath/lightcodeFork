@@ -36,6 +36,12 @@ func main() {
 
 	flag.Parse()
 
+	if !config.ConfigExists() {
+		if err := views.RunOnboarding(); err != nil {
+			log.Fatalf("Onboarding failed: %v", err)
+		}
+	}
+
 	if *isVersion {
 		info, ok := debug.ReadBuildInfo()
 		if !ok || info.Main.Version == "" {

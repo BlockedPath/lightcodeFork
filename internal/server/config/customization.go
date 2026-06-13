@@ -46,41 +46,78 @@ type AllModels struct {
 	RecentModels []RecentModels
 }
 
-func CustomizationPath() (string, error) {
-	path := filepath.Join(Dir(), "config.json")
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		def_prov := getDefaultProviders()
-		bare := Customization{
-			Theme:      "light",
-			SkillsPath: filepath.Join(Dir(), "skills"),
-			Port:       "8080",
-			Providers:  getDefaultProviders(),
-			CurrentModel: ResModel{
-				Model:   def_prov[0].Models[0],
-				BaseUrl: def_prov[0].BaseUrl,
-				ApiKey:  "",
-			},
+// CreateConfig writes a fresh config.json containing only the chosen providers,
+// filling in any API keys collected during onboarding.
+// This is the only place that materializes config.json
+// reads no longer create it.
+func CreateConfig(providerNames []string, keys map[string]string) error {
+	providers := []Provider{}
+	for _, name := range providerNames {
+		if p, ok := ProviderByName(name); ok {
+			p.ApiKey = keys[name]
+			providers = append(providers, p)
 		}
-		d, err := json.MarshalIndent(bare, "", " ")
-		if err != nil {
-			return "", err
-		}
-		_ = os.WriteFile(path, d, 0644)
 	}
-	return path, nil
+	if len(providers) == 0 {
+		providers = AllProviders()
+	}
+	first := ResModel{}
+	if len(providers) > 0 && len(providers[0].Models) > 0 {
+		first = ResModel{
+			Model:   providers[0].Models[0],
+			BaseUrl: providers[0].BaseUrl,
+			ApiKey:  providers[0].ApiKey,
+		}
+	}
+	bare := Customization{
+		Theme:        "light",
+		SkillsPath:   filepath.Join(Dir(), "skills"),
+		Port:         "8080",
+		Providers:    providers,
+		CurrentModel: first,
+	}
+	path := filepath.Join(Dir(), "config.json")
+	d, err := json.MarshalIndent(bare, "", " ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, d, 0644)
+}
+
+func defaultCustomization() Customization {
+	providers := getDefaultProviders()
+	model := ResModel{}
+	if len(providers) > 0 && len(providers[0].Models) > 0 {
+		model = ResModel{Model: providers[0].Models[0], BaseUrl: providers[0].BaseUrl}
+	}
+	return Customization{
+		Theme:        "light",
+		SkillsPath:   filepath.Join(Dir(), "skills"),
+		Port:         "8080",
+		Providers:    providers,
+		CurrentModel: model,
+	}
+}
+
+// CustomizationPath returns the config.json path. It no longer creates the file
+// — onboarding owns creation (see CreateConfig).
+func CustomizationPath() (string, error) {
+	return filepath.Join(Dir(), "config.json"), nil
 }
 
 func GetCustomization() Customization {
 	path, err := CustomizationPath()
 	if err != nil {
-		return Customization{}
+		return defaultCustomization()
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return Customization{}
+		return defaultCustomization()
 	}
 	var customization Customization
-	json.Unmarshal(data, &customization)
+	if err := json.Unmarshal(data, &customization); err != nil {
+		return defaultCustomization()
+	}
 	return customization
 }
 
