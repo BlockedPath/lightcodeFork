@@ -225,7 +225,7 @@ func getModels(w http.ResponseWriter, r *http.Request) {
 	}
 	authModels, err := config.GetAllAuthModels()
 	if err != nil {
-		log.Fatal("fuck no models in openai codex shit bitch", err)
+		log.Println("fuck no models in openai codex shit bitch", err)
 	}
 	// models := make([]ModelInfo, 0, len(list_models)+len(authModels))
 	models := []ModelInfo{}
