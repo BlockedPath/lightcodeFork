@@ -92,6 +92,7 @@ func Lightcode(isServer bool, isTui bool, isDebug bool) {
 		ready := make(chan struct{})
 		go api.Initialise(ready, usablePort, isDebug)
 		<-ready
+		views.LauchHomePage()
 	}
 	if isServer && !isTui {
 		ready := make(chan struct{})
