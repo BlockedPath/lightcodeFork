@@ -5,6 +5,14 @@ import (
 	"path/filepath"
 )
 
+var Debug = false
+
+func ConfigExists() bool {
+	path := filepath.Join(Dir(), "config.json")
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 func Dir() string {
 	home, _ := os.UserHomeDir()
 	dir := filepath.Join(home, ".lightcode")

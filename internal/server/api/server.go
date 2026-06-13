@@ -19,7 +19,6 @@ import (
 	"gorm.io/gorm"
 )
 
-var DEBUG = false
 var DB *gorm.DB
 
 type Request struct {
@@ -27,7 +26,7 @@ type Request struct {
 }
 
 func Initialise(ready chan<- struct{}, port string, isDebug bool) {
-	DEBUG = isDebug
+	config.Debug = isDebug
 	database, err := db.Connect()
 	if err != nil {
 		fmt.Println("Database error")
@@ -134,7 +133,7 @@ func chatcompletion(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
 		return
 	}
-	for result := range agent.New(DB).Run(r.Context(), model, prompt, req.Images, session_id, mode, DEBUG) {
+	for result := range agent.New(DB).Run(r.Context(), model, prompt, req.Images, session_id, mode) {
 		if r.Context().Err() != nil {
 			return
 		}
@@ -225,7 +224,7 @@ func getModels(w http.ResponseWriter, r *http.Request) {
 	}
 	authModels, err := config.GetAllAuthModels()
 	if err != nil {
-		log.Fatal("fuck no models in openai codex shit bitch")
+		log.Println("fuck no models in openai codex shit bitch", err)
 	}
 	// models := make([]ModelInfo, 0, len(list_models)+len(authModels))
 	models := []ModelInfo{}

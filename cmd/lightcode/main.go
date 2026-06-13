@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
 	"math/rand"
 	"net"
 	"os"
@@ -35,6 +36,12 @@ func main() {
 
 	flag.Parse()
 
+	if !config.ConfigExists() {
+		if err := views.RunOnboarding(); err != nil {
+			log.Fatalf("Onboarding failed: %v", err)
+		}
+	}
+
 	if *isVersion {
 		info, ok := debug.ReadBuildInfo()
 		if !ok || info.Main.Version == "" {
@@ -54,6 +61,9 @@ func main() {
 	if *isTui {
 		Lightcode(false, true, *isDebug)
 		return
+	}
+	if !config.HasAnyApiKey() {
+		log.Fatal("Fatal: no API key configured. Edit ~/.lightcode/config.json and add an api_key to at least one provider, then restart.")
 	}
 	if prompt == "" {
 		Lightcode(true, true, *isDebug)
@@ -92,6 +102,7 @@ func Lightcode(isServer bool, isTui bool, isDebug bool) {
 		ready := make(chan struct{})
 		go api.Initialise(ready, usablePort, isDebug)
 		<-ready
+		views.LauchHomePage()
 	}
 	if isServer && !isTui {
 		ready := make(chan struct{})
@@ -119,7 +130,7 @@ func runAgent(prompt string) {
 
 	database.Create(&newMessage)
 	model := config.GetCustomization().CurrentModel
-	for result := range agent.New(database).Run(ctx, model, prompt, [][]byte{}, session_id, "chat", false) {
+	for result := range agent.New(database).Run(ctx, model, prompt, [][]byte{}, session_id, "chat") {
 		fmt.Println(result.Content)
 		for _, tool := range result.ToolCalls {
 			fmt.Printf("%s({%s})", tool.Name, tool.Arguments)
