@@ -50,23 +50,36 @@ type AllModels struct {
 // filling in any API keys collected during onboarding.
 // This is the only place that materializes config.json
 // reads no longer create it.
-func CreateConfig(providerNames []string, keys map[string]string) error {
+func CreateConfig(providerNames []string, keys map[string]string, baseUrls map[string]string, models map[string][]string) error {
 	providers := []Provider{}
 	for _, name := range providerNames {
 		if p, ok := ProviderByName(name); ok {
 			p.ApiKey = keys[name]
 			providers = append(providers, p)
+			continue
+		}
+		// custom ("other") provider: user supplied the base URL and models
+		if url := baseUrls[name]; url != "" {
+			m := models[name]
+			if m == nil {
+				m = []string{}
+			}
+			providers = append(providers, Provider{
+				BaseUrl: url,
+				ApiKey:  keys[name],
+				Models:  m,
+			})
 		}
 	}
 	if len(providers) == 0 {
 		providers = AllProviders()
 	}
+	// default the current model to the first provider that actually has models
 	first := ResModel{}
-	if len(providers) > 0 && len(providers[0].Models) > 0 {
-		first = ResModel{
-			Model:   providers[0].Models[0],
-			BaseUrl: providers[0].BaseUrl,
-			ApiKey:  providers[0].ApiKey,
+	for _, p := range providers {
+		if len(p.Models) > 0 {
+			first = ResModel{Model: p.Models[0], BaseUrl: p.BaseUrl, ApiKey: p.ApiKey}
+			break
 		}
 	}
 	bare := Customization{
