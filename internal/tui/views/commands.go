@@ -43,11 +43,11 @@ func CmdHandler(cmd string, m *model) tea.Cmd {
 		m.textarea.Reset()
 	case "/new_session":
 		resetCurrentSession(m)
-		return func() tea.Msg { return refreshSessionsMsg{} }
+		return tea.Batch(func() tea.Msg { return refreshSessionsMsg{} }, refreshGitStatusCmd(m.gitStatusDirectory()))
 
 	case "/delete_session":
 		deleteCurrentSession(m)
-		return func() tea.Msg { return refreshSessionsMsg{} }
+		return tea.Batch(func() tea.Msg { return refreshSessionsMsg{} }, refreshGitStatusCmd(m.gitStatusDirectory()))
 
 	case "/export":
 		path, err := exportCurrentSessionMarkdown(m, m.currentSession)
@@ -108,6 +108,7 @@ func resetCurrentSession(m *model) {
 	m.messages = []models.Message{}
 	m.completeMessages = []models.Message{}
 	m.currentContextSize = 0
+	m.gitStatus = defaultStatusLineGitInfo(m.gitStatusDirectory())
 	m.viewport.SetContent(renderMessages(m.messages, m.width))
 	m.textarea.Reset()
 	m.viewport.GotoBottom()

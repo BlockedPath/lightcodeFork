@@ -1,10 +1,13 @@
 package views
 
 import (
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/Kartik-2239/lightcode/internal/server/api"
 	"github.com/Kartik-2239/lightcode/internal/server/config"
+	"github.com/Kartik-2239/lightcode/internal/server/db/models"
 )
 
 func TestFreshCodexLoginScript(t *testing.T) {
@@ -121,5 +124,35 @@ func TestContextWindowForCodexModel(t *testing.T) {
 	model := api.ModelInfo{Model: "gpt-5.5", BaseUrl: "codex"}
 	if got := contextWindowForModel(model); got != 258000 {
 		t.Fatalf("expected 258000 context window, got %d", got)
+	}
+}
+
+func TestRenderStatusLineUsesCachedGitInfo(t *testing.T) {
+	model := api.ModelInfo{Model: "gpt-5.5", BaseUrl: "codex", ReasoningEffort: "high"}
+	line := renderStatusLine(model, 620000, 120, statusLineGitInfo{Branch: "main", Changes: "No changes"})
+	if !strings.Contains(line, "gpt-5.5 high") {
+		t.Fatalf("expected model and effort in status line, got %q", line)
+	}
+	if !strings.Contains(line, "main") || !strings.Contains(line, "No changes") {
+		t.Fatalf("expected cached git info in status line, got %q", line)
+	}
+}
+
+func TestExpandWorkingDirExpandsHome(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	got := expandWorkingDir("~/repo")
+	want := filepath.Join(home, "repo")
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
+func TestShouldRefreshGitAfterFilesystemToolCall(t *testing.T) {
+	if !shouldRefreshGitAfterToolCall(models.StoredMessageData{Role: "tool_call", ToolCalls: []models.StoredToolCall{{Name: "bash"}}}) {
+		t.Fatal("expected bash tool call to refresh git status")
+	}
+	if shouldRefreshGitAfterToolCall(models.StoredMessageData{Role: "tool_call", ToolCalls: []models.StoredToolCall{{Name: "read_file"}}}) {
+		t.Fatal("did not expect read-only tool call to refresh git status")
 	}
 }
