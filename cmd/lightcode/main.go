@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
 	"math/rand"
 	"net"
 	"os"
@@ -54,6 +55,9 @@ func main() {
 	if *isTui {
 		Lightcode(false, true, *isDebug)
 		return
+	}
+	if !config.HasAnyApiKey() {
+		log.Fatal("Fatal: no API key configured. Edit ~/.lightcode/config.json and add an api_key to at least one provider, then restart.")
 	}
 	if prompt == "" {
 		Lightcode(true, true, *isDebug)

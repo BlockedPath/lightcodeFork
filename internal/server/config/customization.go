@@ -194,6 +194,15 @@ func SetCurrentModel(model ResModel) error {
 	return nil
 }
 
+func HasAnyApiKey() bool {
+	for _, p := range GetCustomization().Providers {
+		if p.ApiKey != "" {
+			return true
+		}
+	}
+	return false
+}
+
 func GetCurrentModel() (ResModel, error) {
 	customization := GetCustomization()
 	if customization.CurrentModel.Model != "" {
