@@ -106,6 +106,7 @@ type model struct {
 	isCompacting       bool
 	queue              []queue
 	currentContextSize int64
+	gitStatus          statusLineGitInfo
 	enter_api_win      bool
 	isError            bool
 	errorMessage       string
@@ -221,6 +222,7 @@ func initialModel() model {
 		pastedImgs:         make(map[int][]byte),
 		pastedImgPreviews:  make(map[int]kittyPreview),
 		currentContextSize: 0,
+		gitStatus:          defaultStatusLineGitInfo("."),
 		enter_api_win:      false,
 	}
 	if len(modelsList) == 0 {
@@ -239,7 +241,7 @@ func initialModel() model {
 }
 
 func (m model) Init() tea.Cmd {
-	return textarea.Blink
+	return tea.Batch(textarea.Blink, refreshGitStatusCmd(m.gitStatusDirectory()))
 }
 
 func (m *model) syncLayout() {
@@ -364,6 +366,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.syncLayout()
 				m.viewport.SetContent(renderMessages(m.messages, m.width))
 				m.viewport.GotoBottom()
+				return m, tea.Batch(cmd, refreshGitStatusCmd(m.gitStatusDirectory()))
 			case "esc":
 				m.islistSessionWin = false
 				return m, nil
@@ -489,12 +492,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.queue = append(m.queue, queue{prompt: m.textarea.Value()})
 						m.textarea.SetValue("")
 						m.syncLayout()
-						return m, nil
+						return m, refreshGitStatusCmd(m.gitStatusDirectory())
 					}
 					val := m.textarea.Value()
 					m.textarea.SetValue("")
 					m.syncLayout()
-					return m, m.beginGeneration(val)
+					return m, tea.Batch(refreshGitStatusCmd(m.gitStatusDirectory()), m.beginGeneration(val))
 				}
 				m.syncLayout()
 				if len(curCommand) > 1 {
@@ -514,12 +517,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.queue = append(m.queue, queue{prompt: m.textarea.Value()})
 				m.textarea.SetValue("")
 				m.syncLayout()
-				return m, nil
+				return m, refreshGitStatusCmd(m.gitStatusDirectory())
 			}
 			val := m.textarea.Value()
 			m.textarea.SetValue("")
 			m.syncLayout()
-			return m, m.beginGeneration(val)
+			return m, tea.Batch(refreshGitStatusCmd(m.gitStatusDirectory()), m.beginGeneration(val))
 		case "shift+enter":
 			m.textarea.SetValue(m.textarea.Value() + "\n")
 			m.resizeTextareaToContent()
@@ -668,6 +671,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.refreshMessagesView()
 		m.syncLayout()
+		var refreshGit tea.Cmd
+		if msg.Role == "tool_call" && shouldRefreshGitAfterToolCall(models.StoredMessageData(msg)) {
+			refreshGit = refreshGitStatusCmd(m.gitStatusDirectory())
+		}
 		if msg.Role == "question" {
 			questions := parseQuestions(msg.Content)
 			if len(questions) > 0 {
@@ -689,7 +696,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.syncLayout()
 			}
 		}
-		return m, waitForMessages(m.streamCh)
+		return m, tea.Batch(refreshGit, waitForMessages(m.streamCh))
 
 	case streamDoneMsg:
 		m.streamCh = nil
@@ -709,7 +716,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			// temp will turn this into a function
 			if len(m.queue) > 0 {
-				return m, m.runNextQueuedPrompt()
+				return m, tea.Batch(refreshGitStatusCmd(m.gitStatusDirectory()), m.runNextQueuedPrompt())
 			}
 			if len(m.queue) == 0 {
 				contextSize, err := client.GetContextSize(m.currentSession.ID)
@@ -719,12 +726,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.currentContextSize = contextSize
 				}
 				m.syncLayout()
-				return m, nil
+				return m, refreshGitStatusCmd(m.gitStatusDirectory())
 			}
 
 		}
 		m.refreshMessagesView()
 		m.syncLayout()
+		return m, nil
+
+	case gitStatusMsg:
+		if m.isCurrentGitStatus(msg.status) {
+			m.gitStatus = msg.status
+		}
 		return m, nil
 
 	case compactMemoryDoneMsg:
@@ -835,7 +848,7 @@ func (m model) View() tea.View {
 	if m.modelsListIndex >= 0 && m.modelsListIndex < len(m.modelsList) {
 		currentModel = m.modelsList[m.modelsListIndex]
 	}
-	sections = append(sections, renderStatusLine(currentModel, m.currentContextSize, m.width))
+	sections = append(sections, renderStatusLine(currentModel, m.currentContextSize, m.width, m.gitStatus))
 
 	if m.isGenerating || m.isCompacting {
 		if m.showEscMsg {
@@ -956,6 +969,20 @@ func findModelIndex(modelsList []api.ModelInfo, selectedModel api.ModelInfo) int
 	}
 	return 0
 }
+
+func shouldRefreshGitAfterToolCall(msg models.StoredMessageData) bool {
+	if len(msg.CodeChanges) > 0 {
+		return true
+	}
+	for _, call := range msg.ToolCalls {
+		switch call.Name {
+		case "bash", "edit", "write_file":
+			return true
+		}
+	}
+	return false
+}
+
 func parseQuestions(content string) []questionItem {
 	var args map[string]any
 	if err := json.Unmarshal([]byte(content), &args); err != nil {
@@ -1128,7 +1155,7 @@ func (m model) submitQuestionAnswers() (tea.Model, tea.Cmd) {
 		parts = append(parts, fmt.Sprintf("Q: %s\nA: %s", q.question, m.questionAnswers[i]))
 	}
 	answer := strings.Join(parts, "\n\n")
-	return m, m.beginGeneration(answer)
+	return m, tea.Batch(refreshGitStatusCmd(m.gitStatusDirectory()), m.beginGeneration(answer))
 }
 
 // func (m model) getMouseSelection() {

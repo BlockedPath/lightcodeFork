@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -26,15 +27,29 @@ func shortenDir(curDir string) string {
 	return strings.Replace(curDir, home, "~", 1)
 }
 
-func renderStatusLine(model api.ModelInfo, usedTokens int64, width int) string {
+type statusLineGitInfo struct {
+	Directory string
+	Branch    string
+	Changes   string
+}
+
+func defaultStatusLineGitInfo(directory string) statusLineGitInfo {
+	return statusLineGitInfo{
+		Directory: expandWorkingDir(directory),
+		Branch:    "No git",
+		Changes:   "No git",
+	}
+}
+
+func renderStatusLine(model api.ModelInfo, usedTokens int64, width int, git statusLineGitInfo) string {
 	parts := []string{}
 	if model.Model != "" {
 		parts = append(parts, modelStatusName(model))
 	} else {
 		parts = append(parts, "No model")
 	}
-	parts = append(parts, gitBranchLabel())
-	parts = append(parts, gitChangesLabel())
+	parts = append(parts, git.Branch)
+	parts = append(parts, git.Changes)
 	parts = append(parts, FormatK(usedTokens)+" used")
 	parts = append(parts, FormatK(contextWindowForModel(model))+" window")
 
@@ -64,20 +79,59 @@ func reasoningEffortLabel(effort string) string {
 	}
 }
 
-func gitBranchLabel() string {
-	branch, err := exec.Command("git", "branch", "--show-current").Output()
+func loadStatusLineGitInfo(directory string) statusLineGitInfo {
+	dir := expandWorkingDir(directory)
+	return statusLineGitInfo{
+		Directory: dir,
+		Branch:    gitBranchLabel(dir),
+		Changes:   gitChangesLabel(dir),
+	}
+}
+
+func expandWorkingDir(directory string) string {
+	dir := strings.TrimSpace(directory)
+	if dir == "" || dir == "." {
+		wd, err := os.Getwd()
+		if err != nil {
+			return "."
+		}
+		return wd
+	}
+	if dir == "~" {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			return home
+		}
+	}
+	if strings.HasPrefix(dir, "~/") {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			return filepath.Join(home, strings.TrimPrefix(dir, "~/"))
+		}
+	}
+	return dir
+}
+
+func gitBranchLabel(directory string) string {
+	cmd := exec.Command("git", "branch", "--show-current")
+	cmd.Dir = directory
+	branch, err := cmd.Output()
 	if err == nil && strings.TrimSpace(string(branch)) != "" {
 		return strings.TrimSpace(string(branch))
 	}
-	commit, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output()
+	cmd = exec.Command("git", "rev-parse", "--short", "HEAD")
+	cmd.Dir = directory
+	commit, err := cmd.Output()
 	if err == nil && strings.TrimSpace(string(commit)) != "" {
 		return strings.TrimSpace(string(commit))
 	}
 	return "No git"
 }
 
-func gitChangesLabel() string {
-	out, err := exec.Command("git", "status", "--porcelain").Output()
+func gitChangesLabel(directory string) string {
+	cmd := exec.Command("git", "status", "--porcelain")
+	cmd.Dir = directory
+	out, err := cmd.Output()
 	if err != nil {
 		return "No git"
 	}
