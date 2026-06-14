@@ -3,6 +3,8 @@ package oauth
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/Kartik-2239/lightcode/internal/server/config"
 )
 
 func TestCopilotModelsResponseAcceptsWrappedModels(t *testing.T) {
@@ -55,5 +57,22 @@ func TestResolveCopilotModelMapsAutoToDefaultID(t *testing.T) {
 	}
 	if model.ID != "gpt-5.4-mini" || model.SupportedEndpoints[0] != "/responses" {
 		t.Fatalf("unexpected Auto mapping: %#v", model)
+	}
+}
+
+func TestGetCopilotAuthValDoesNotFallbackToLegacyGithub(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	if err := config.UpdateAuthVal("github", config.AuthVal{
+		Type:   "oauth",
+		Access: "legacy-token",
+	}); err != nil {
+		t.Fatalf("UpdateAuthVal returned error: %v", err)
+	}
+
+	authVal, err := getCopilotAuthVal()
+	if err == nil {
+		t.Fatalf("expected missing copilot auth error, got auth %#v", authVal)
 	}
 }
