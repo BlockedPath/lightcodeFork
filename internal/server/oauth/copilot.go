@@ -18,7 +18,6 @@ const githubDeviceCodeURL = "https://github.com/login/device/code"
 const githubAccessTokenURL = "https://github.com/login/oauth/access_token"
 const githubCopilotClientID = "178c6fc778ccc68e1d6a"
 const githubCopilotScope = "read:org"
-const legacyGithubAuthProvider = "github"
 
 type AuthResponse struct {
 	AccessToken      string `json:"access_token"`
@@ -389,13 +388,5 @@ func makeCopilotRequest(endpoint string, request any, response any) error {
 }
 
 func getCopilotAuthVal() (config.AuthVal, error) {
-	val, err := config.GetAuthVal(config.CopilotAuthProvider)
-	if err == nil {
-		return val, nil
-	}
-	legacy, legacyErr := config.GetAuthVal(legacyGithubAuthProvider)
-	if legacyErr == nil {
-		return legacy, nil
-	}
-	return config.AuthVal{}, err
+	return config.GetAuthVal(config.CopilotAuthProvider)
 }

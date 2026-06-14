@@ -10,14 +10,6 @@ import (
 	"github.com/Kartik-2239/lightcode/internal/server/db/models"
 )
 
-func TestFreshCodexLoginScript(t *testing.T) {
-	got := freshCodexLoginScript([]string{"login"})
-	want := "codex logout >/dev/null 2>&1; exec codex login"
-	if got != want {
-		t.Fatalf("expected %q, got %q", want, got)
-	}
-}
-
 func TestDefaultLogoutProviders(t *testing.T) {
 	providers := defaultLogoutProviders()
 	if len(providers) != 2 {

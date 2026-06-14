@@ -29,17 +29,18 @@ type logoutFinishedMsg struct {
 }
 
 type copilotLoginStartedMsg struct {
-	provider loginProvider
-	device   oauth.DeviceCodeResponse
-	openErr  error
-	err      error
+	provider  loginProvider
+	device    oauth.DeviceCodeResponse
+	codexFlow *oauth.CodexLoginFlow
+	openErr   error
+	err       error
 }
 
 func defaultLoginProviders() []loginProvider {
 	return []loginProvider{
 		{
 			name:        "codex",
-			description: "ChatGPT OAuth in browser",
+			description: "ChatGPT device login",
 			args:        []string{"login"},
 		},
 		{
@@ -124,20 +125,12 @@ func runLoginProviderCmd(provider loginProvider) tea.Cmd {
 	if provider.name == "copilot" {
 		return startCopilotLoginCmd(provider)
 	}
-	if provider.name != "codex" && provider.name != "codex-device" {
-		return func() tea.Msg {
-			return loginFinishedMsg{provider: provider, err: fmt.Errorf("login provider %q is not supported", provider.name)}
-		}
+	if provider.name == "codex" || provider.name == "codex-device" {
+		return startCodexLoginCmd(provider)
 	}
-	if err := config.DeleteAuthVal(config.CodexAuthProvider); err != nil {
-		return func() tea.Msg {
-			return loginFinishedMsg{provider: provider, err: err}
-		}
+	return func() tea.Msg {
+		return loginFinishedMsg{provider: provider, err: fmt.Errorf("login provider %q is not supported", provider.name)}
 	}
-	cmd := exec.Command("sh", "-c", freshCodexLoginScript(provider.args))
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		return loginFinishedMsg{provider: provider, err: err}
-	})
 }
 
 func runLogoutProviderCmd(provider loginProvider) tea.Cmd {
@@ -157,9 +150,9 @@ func runLogoutProviderCmd(provider loginProvider) tea.Cmd {
 			return logoutFinishedMsg{provider: provider, err: err}
 		}
 	}
-	return tea.ExecProcess(exec.Command("codex", "logout"), func(err error) tea.Msg {
-		return logoutFinishedMsg{provider: provider, err: err}
-	})
+	return func() tea.Msg {
+		return logoutFinishedMsg{provider: provider, err: nil}
+	}
 }
 
 func startCopilotLoginCmd(provider loginProvider) tea.Cmd {
@@ -176,11 +169,42 @@ func startCopilotLoginCmd(provider loginProvider) tea.Cmd {
 	}
 }
 
+func startCodexLoginCmd(provider loginProvider) tea.Cmd {
+	return func() tea.Msg {
+		if err := config.DeleteAuthVal(config.CodexAuthProvider); err != nil {
+			return copilotLoginStartedMsg{provider: provider, err: err}
+		}
+		flow, err := oauth.StartCodexLoginFlow()
+		if err != nil {
+			return copilotLoginStartedMsg{provider: provider, err: err}
+		}
+		msg := copilotLoginStartedMsg{
+			provider:  provider,
+			codexFlow: &flow,
+			openErr:   openURL(flow.AuthURL),
+		}
+		if flow.Device != nil {
+			msg.device = *flow.Device
+		}
+		return msg
+	}
+}
+
 func pollCopilotLoginCmd(provider loginProvider, device oauth.DeviceCodeResponse) tea.Cmd {
 	return func() tea.Msg {
 		token, err := oauth.WaitForAccessToken(device)
 		if err == nil {
 			err = oauth.SaveAccessToken(token.AccessToken)
+		}
+		return loginFinishedMsg{provider: provider, err: err}
+	}
+}
+
+func pollCodexLoginCmd(provider loginProvider, flow oauth.CodexLoginFlow) tea.Cmd {
+	return func() tea.Msg {
+		authVal, err := oauth.WaitForCodexLogin(flow)
+		if err == nil {
+			err = oauth.SaveCodexAuth(authVal)
 		}
 		return loginFinishedMsg{provider: provider, err: err}
 	}
@@ -202,14 +226,6 @@ func openURL(uri string) error {
 	return cmd.Start()
 }
 
-func freshCodexLoginScript(args []string) string {
-	command := "codex login"
-	if len(args) > 1 && args[1] == "--device-auth" {
-		command += " --device-auth"
-	}
-	return "codex logout >/dev/null 2>&1; exec " + command
-}
-
 func (m model) handleCopilotLoginStarted(msg copilotLoginStartedMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
 		appendCommandStatusMessage(&m, fmt.Sprintf("Login failed for %s: %s", msg.providerLabel(), msg.err.Error()))
@@ -218,8 +234,22 @@ func (m model) handleCopilotLoginStarted(msg copilotLoginStartedMsg) (tea.Model,
 	if msg.openErr != nil {
 		appendCommandStatusMessage(&m, fmt.Sprintf("Could not open browser automatically: %s", msg.openErr.Error()))
 	}
-	appendCommandStatusMessage(&m, fmt.Sprintf("GitHub Copilot login: enter %s at %s. Waiting for authorization...", msg.device.UserCode, msg.device.VerificationURI))
-	return m, pollCopilotLoginCmd(msg.provider, msg.device)
+	switch msg.provider.name {
+	case "codex", "codex-device":
+		if msg.codexFlow == nil {
+			appendCommandStatusMessage(&m, "Login failed for codex: codex login flow was not started")
+			return m, nil
+		}
+		if msg.codexFlow.Device != nil {
+			appendCommandStatusMessage(&m, fmt.Sprintf("Codex login: enter %s at %s. Waiting for authorization...", msg.device.UserCode, msg.device.VerificationURI))
+		} else {
+			appendCommandStatusMessage(&m, fmt.Sprintf("Codex login: complete sign-in in the browser at %s. Waiting for authorization...", msg.codexFlow.AuthURL))
+		}
+		return m, pollCodexLoginCmd(msg.provider, *msg.codexFlow)
+	default:
+		appendCommandStatusMessage(&m, fmt.Sprintf("GitHub Copilot login: enter %s at %s. Waiting for authorization...", msg.device.UserCode, msg.device.VerificationURI))
+		return m, pollCopilotLoginCmd(msg.provider, msg.device)
+	}
 }
 
 func (m model) handleLoginFinished(msg loginFinishedMsg) (tea.Model, tea.Cmd) {
@@ -229,10 +259,6 @@ func (m model) handleLoginFinished(msg loginFinishedMsg) (tea.Model, tea.Cmd) {
 	}
 	switch msg.provider.name {
 	case "codex", "codex-device":
-		if err := config.ImportCodexAuth(); err != nil {
-			appendCommandStatusMessage(&m, fmt.Sprintf("Codex login finished, but auth import failed: %s", err.Error()))
-			return m, nil
-		}
 		modelsList, err := loadModelsList()
 		if err == nil {
 			m.modelsList = modelsList
